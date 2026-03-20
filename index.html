@@ -1,0 +1,2066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SBA AI Closing Machine</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#08080d;--bg2:#0e0e16;--bg3:#14141e;--card:#181824;--card2:#1e1e2e;
+  --border:#252538;--border2:#35354a;
+  --gold:#e2b340;--gold2:#c99b2e;--gold-g:rgba(226,179,64,0.1);
+  --green:#22c55e;--green-g:rgba(34,197,94,0.1);
+  --blue:#3b82f6;--blue-g:rgba(59,130,246,0.1);
+  --orange:#f97316;--orange-g:rgba(249,115,22,0.1);
+  --red:#ef4444;--red-g:rgba(239,68,68,0.1);
+  --purple:#8b5cf6;--purple-g:rgba(139,92,246,0.1);
+  --cyan:#06b6d4;
+  --t1:#eeeae2;--t2:#7c7c8e;--t3:#4e4e5e;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--t1);font-family:'Manrope',sans-serif;min-height:100vh;overflow-x:hidden;}
+::selection{background:var(--gold);color:var(--bg);}
+
+/* ═══ LAYOUT ═══ */
+.app{display:grid;grid-template-columns:280px 1fr 340px;grid-template-rows:56px 1fr;height:100vh;}
+.topbar{grid-column:1/-1;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:16px;z-index:10;}
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);overflow-y:auto;padding:12px;}
+.main{overflow-y:auto;padding:20px;background:var(--bg);}
+.right{background:var(--bg2);border-left:1px solid var(--border);overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;}
+
+/* ═══ TOPBAR ═══ */
+.logo{font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.logo .icon{width:32px;height:32px;background:linear-gradient(135deg,var(--gold),var(--gold2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.top-tabs{display:flex;gap:2px;margin-left:24px;background:var(--bg3);border-radius:8px;padding:2px;}
+.top-tab{padding:7px 16px;background:transparent;border:none;border-radius:6px;color:var(--t2);font-family:'Manrope';font-size:12px;font-weight:600;cursor:pointer;transition:0.2s;white-space:nowrap;}
+.top-tab.on{background:var(--gold);color:var(--bg);}
+.top-tab:hover:not(.on){color:var(--t1);background:var(--bg);}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+
+/* ═══ SIDEBAR — Pipeline ═══ */
+.sb-section{margin-bottom:16px;}
+.sb-head{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:4px 8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;}
+.sb-count{font-family:'JetBrains Mono';font-size:10px;padding:1px 6px;border-radius:4px;font-weight:700;}
+.contact-card{padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:4px;cursor:pointer;transition:0.15s;position:relative;}
+.contact-card:hover{border-color:var(--gold);background:var(--card2);}
+.contact-card.active{border-color:var(--gold);background:var(--gold-g);}
+.cc-name{font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center;}
+.cc-meta{font-size:10px;color:var(--t3);margin-top:2px;display:flex;gap:6px;align-items:center;}
+.cc-badge{font-size:9px;padding:1px 6px;border-radius:3px;font-weight:700;}
+.cc-due{font-size:9px;color:var(--gold);font-weight:600;margin-top:3px;}
+.cc-stage{font-size:9px;padding:1px 5px;border-radius:3px;font-weight:600;}
+
+/* ═══ MAIN — Conversation ═══ */
+.thread{flex:1;overflow-y:auto;padding:16px 0;}
+.msg{margin-bottom:12px;max-width:75%;animation:fadeIn 0.2s ease;}
+.msg.sent{margin-left:auto;}
+.msg.recv{margin-right:auto;}
+.msg .bubble{padding:11px 15px;border-radius:16px;font-size:13.5px;line-height:1.55;position:relative;}
+.msg.sent .bubble{background:linear-gradient(135deg,#1a6de8,#1558b8);color:#fff;border-bottom-right-radius:4px;}
+.msg.recv .bubble{background:var(--card);border:1px solid var(--border);border-bottom-left-radius:4px;}
+.msg .who{font-size:10px;color:var(--t3);margin-bottom:3px;font-weight:600;}
+.msg .ts{font-size:9px;color:var(--t3);margin-top:3px;text-align:right;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+
+.main-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:40px;}
+.main-empty .big{font-size:48px;margin-bottom:16px;}
+.main-empty h2{font-size:18px;font-weight:700;margin-bottom:8px;}
+.main-empty p{font-size:13px;color:var(--t2);max-width:360px;line-height:1.6;}
+
+/* Reply bar */
+.reply-bar{padding:12px 16px;border-top:1px solid var(--border);background:var(--bg2);display:flex;gap:8px;align-items:flex-end;}
+.reply-input{flex:1;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;color:var(--t1);font-family:'Manrope';font-size:13px;resize:none;outline:none;max-height:120px;min-height:42px;line-height:1.4;}
+.reply-input:focus{border-color:var(--gold);}
+.reply-input::placeholder{color:var(--t3);}
+
+/* ═══ RIGHT PANEL ═══ */
+.rp-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;transition:0.2s;}
+.rp-card h4{font-size:12px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px;color:var(--t1);}
+.rp-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11px;}
+.rp-row .label{color:var(--t2);}
+.rp-row .val{font-family:'JetBrains Mono';font-weight:600;font-size:11px;}
+
+/* Hierarchy bar */
+.hierarchy{display:flex;gap:3px;margin:8px 0;}
+.h-step{flex:1;padding:6px 4px;text-align:center;font-size:9px;font-weight:700;border-radius:5px;cursor:pointer;transition:0.2s;border:1px solid transparent;letter-spacing:0.3px;}
+.h-step.active{border-color:currentColor;box-shadow:0 0 8px currentColor;}
+.h-step.done{opacity:0.4;text-decoration:line-through;}
+
+/* Suggestion bubble */
+.suggestion{background:var(--card);border:2px solid var(--gold);border-radius:12px;padding:14px;position:relative;margin:8px 0;}
+.suggestion::before{content:'AI SUGGESTION';position:absolute;top:-7px;left:12px;background:var(--gold);color:var(--bg);font-size:8px;font-weight:800;padding:1px 8px;border-radius:3px;letter-spacing:1px;}
+.sugg-text{font-size:13px;line-height:1.6;margin-top:4px;}
+.sugg-actions{display:flex;gap:4px;margin-top:10px;flex-wrap:wrap;}
+
+/* Analysis */
+.analysis-box{background:linear-gradient(135deg,var(--purple-g),var(--blue-g));border:1px solid var(--purple);border-radius:10px;padding:12px;}
+.det-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;margin:2px;}
+
+/* Blocker */
+.blocker-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:6px 0;}
+.blocker-btn{padding:8px;text-align:center;font-size:10px;font-weight:700;border-radius:6px;cursor:pointer;border:1px solid var(--border);background:var(--bg3);transition:0.2s;}
+.blocker-btn:hover{border-color:var(--gold);}
+.blocker-btn.active{border-color:var(--gold);background:var(--gold-g);}
+
+/* Buttons */
+.btn{padding:8px 14px;border:none;border-radius:7px;font-family:'Manrope';font-size:11px;font-weight:700;cursor:pointer;transition:0.15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+.btn:hover{transform:translateY(-1px);}
+.btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a0a0f;}
+.btn-blue{background:var(--blue);color:#fff;}
+.btn-green{background:var(--green);color:#fff;}
+.btn-purple{background:var(--purple);color:#fff;}
+.btn-orange{background:var(--orange);color:#fff;}
+.btn-red{background:var(--red);color:#fff;}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--t2);}
+.btn-ghost:hover{border-color:var(--t2);color:var(--t1);}
+.btn-sm{padding:5px 10px;font-size:10px;}
+.btn-full{width:100%;}
+
+/* Inputs */
+.field{margin-bottom:10px;}
+.field-lbl{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;}
+.field-in{width:100%;padding:9px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--t1);font-family:'Manrope';font-size:12px;outline:none;transition:border-color 0.2s;}
+.field-in:focus{border-color:var(--gold);}
+select.field-in{cursor:pointer;}
+textarea.field-in{resize:none;min-height:50px;}
+
+/* Warm-up progress */
+.warmup-track{display:flex;align-items:center;gap:0;margin:10px 0;}
+.wu-step{flex:1;text-align:center;padding:8px 4px;font-size:9px;font-weight:700;color:var(--t3);position:relative;cursor:pointer;transition:0.2s;}
+.wu-step::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--border);border-radius:2px;}
+.wu-step.done::after{background:var(--green);}
+.wu-step.current::after{background:var(--gold);}
+.wu-step.current{color:var(--gold);}
+.wu-step.done{color:var(--green);}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+.modal-bg.open{display:flex;}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:14px;width:480px;max-width:95vw;max-height:90vh;overflow-y:auto;padding:24px;}
+.modal h3{font-size:16px;font-weight:800;margin-bottom:14px;}
+
+/* Drip timeline */
+.drip-day{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
+.drip-day:last-child{border-bottom:none;}
+.drip-num{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono';font-size:12px;font-weight:700;flex-shrink:0;}
+.drip-content{flex:1;font-size:12px;}
+.drip-content .title{font-weight:700;margin-bottom:3px;}
+.drip-content .script{color:var(--t2);line-height:1.5;margin-top:4px;padding:8px;background:var(--bg3);border-radius:6px;font-size:11px;}
+
+/* Spinner */
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 0.6s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--gold);color:var(--t1);padding:10px 20px;border-radius:8px;font-size:12px;font-weight:600;z-index:999;display:none;}
+.toast.show{display:block;animation:fadeIn 0.2s ease;}
+
+/* Responsive */
+@media(max-width:1100px){.app{grid-template-columns:240px 1fr 300px;}}
+@media(max-width:900px){.app{grid-template-columns:1fr;grid-template-rows:56px auto;}.sidebar,.right{display:none;}.sidebar.mob-open,.right.mob-open{display:block;position:fixed;inset:56px 0 0;z-index:50;}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ═══ TOPBAR ═══ -->
+  <div class="topbar">
+    <div class="logo"><div class="icon">🤖</div><span>AI Closer</span></div>
+    <div class="top-tabs">
+      <button class="top-tab on" onclick="switchView('closer',this)">💬 Closer</button>
+      <button class="top-tab" onclick="switchView('pipeline',this)">📊 Pipeline</button>
+      <button class="top-tab" onclick="switchView('drips',this)">💧 Drips</button>
+      <button class="top-tab" onclick="switchView('analytics',this)">📈 Analytics</button>
+    </div>
+    <div class="top-right">
+      <button class="btn btn-purple btn-sm" onclick="openBulkImport()">📁 Bulk Import</button>
+      <button class="btn btn-gold btn-sm" onclick="openAddModal()">➕ Add Contact</button>
+      <button class="btn btn-ghost btn-sm" onclick="openSettings()">⚙️</button>
+    </div>
+  </div>
+
+  <!-- ═══ LEFT SIDEBAR — Contact Pipeline ═══ -->
+  <div class="sidebar" id="sidebar">
+    <div style="margin-bottom:10px;">
+      <input class="field-in" placeholder="🔍 Search contacts..." id="searchContacts" oninput="filterSidebar()" style="font-size:11px;padding:7px 10px;">
+    </div>
+    <div id="sidebarContacts"></div>
+  </div>
+
+  <!-- ═══ MAIN — Conversation / Views ═══ -->
+  <div class="main" id="mainArea">
+    <!-- Empty state -->
+    <div class="main-empty" id="emptyState">
+      <div class="big">🤖</div>
+      <h2>AI Closing Machine</h2>
+      <p>Select a contact from the sidebar or add a new one to start closing. The AI will guide you through Keith's 7-phase closing process.</p>
+      <button class="btn btn-gold" style="margin-top:16px;" onclick="openAddModal()">➕ Add Your First Contact</button>
+    </div>
+
+    <!-- Conversation view (shown when contact selected) -->
+    <div id="convoView" style="display:none;height:100%;display:none;flex-direction:column;">
+      <!-- Contact header -->
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;background:var(--bg2);border-radius:10px 10px 0 0;">
+        <div style="width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;" id="convoAvatar">—</div>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:700;" id="convoName">—</div>
+          <div style="font-size:10px;color:var(--t2);display:flex;gap:8px;align-items:center;" id="convoMeta"></div>
+        </div>
+        <div style="display:flex;gap:4px;" id="convoActions"></div>
+      </div>
+
+      <!-- Warm-up progress bar -->
+      <div style="padding:8px 16px;background:var(--bg2);border-bottom:1px solid var(--border);">
+        <div class="warmup-track" id="warmupTrack">
+          <div class="wu-step current" data-stage="curiosity">Curiosity</div>
+          <div class="wu-step" data-stage="permission">Permission</div>
+          <div class="wu-step" data-stage="microcommit">Micro-Commit</div>
+          <div class="wu-step" data-stage="value">Value Drop</div>
+          <div class="wu-step" data-stage="pitch">Pitch</div>
+          <div class="wu-step" data-stage="call">Phone Call</div>
+          <div class="wu-step" data-stage="threeway">3-Way</div>
+          <div class="wu-step" data-stage="zoom">Zoom</div>
+          <div class="wu-step" data-stage="trial">Trial</div>
+          <div class="wu-step" data-stage="close">Close</div>
+        </div>
+      </div>
+
+      <!-- Thread -->
+      <div class="thread" id="convoThread"></div>
+
+      <!-- Reply bar -->
+      <div class="reply-bar">
+        <textarea class="reply-input" id="replyInput" placeholder="Paste their reply here..." rows="1" oninput="autoGrow(this)"></textarea>
+        <button class="btn btn-blue btn-sm" onclick="analyzeReply()">🧠 Analyze</button>
+        <button class="btn btn-gold btn-sm" onclick="aiGenerate()">⚡ AI</button>
+      </div>
+    </div>
+
+    <!-- Pipeline view -->
+    <div id="pipelineView" style="display:none;"></div>
+    <!-- Drips view -->
+    <div id="dripsView" style="display:none;"></div>
+    <!-- Analytics view -->
+    <div id="analyticsView" style="display:none;"></div>
+  </div>
+
+  <!-- ═══ RIGHT PANEL — Intelligence ═══ -->
+  <div class="right" id="rightPanel">
+    <!-- Contact Intel -->
+    <div class="rp-card" id="rp-intel" style="display:none;">
+      <h4>📋 Contact Intel</h4>
+      <div id="rpIntelContent"></div>
+    </div>
+
+    <!-- Closing Hierarchy -->
+    <div class="rp-card" id="rp-hierarchy" style="display:none;">
+      <h4>🎯 Closing Hierarchy</h4>
+      <div class="hierarchy" id="closingHierarchy">
+        <div class="h-step active" style="color:var(--red);background:var(--red-g);" data-h="text">TEXT<br>CLOSE</div>
+        <div class="h-step" style="color:var(--orange);background:var(--orange-g);" data-h="phone">📞<br>PHONE</div>
+        <div class="h-step" style="color:var(--gold);background:var(--gold-g);" data-h="threeway">👥<br>3-WAY</div>
+        <div class="h-step" style="color:var(--purple);background:var(--purple-g);" data-h="zoom">📹<br>ZOOM</div>
+        <div class="h-step" style="color:var(--blue);background:var(--blue-g);" data-h="trial">🎁<br>TRIAL</div>
+      </div>
+      <div id="hierarchyAction" style="font-size:11px;color:var(--t2);margin-top:6px;padding:8px;background:var(--bg3);border-radius:6px;"></div>
+    </div>
+
+    <!-- AI Analysis -->
+    <div class="rp-card" id="rp-analysis" style="display:none;">
+      <h4>🧠 AI Analysis</h4>
+      <div id="rpAnalysis"></div>
+    </div>
+
+    <!-- Suggestion -->
+    <div class="suggestion" id="rp-suggestion" style="display:none;">
+      <div class="sugg-text" id="suggText"></div>
+      <div class="sugg-actions">
+        <button class="btn btn-sm btn-gold" onclick="copySugg()">📋 Copy</button>
+        <button class="btn btn-sm btn-ghost" onclick="aiGenerate()">🧠 Regen</button>
+        <button class="btn btn-sm btn-green" onclick="markSent()">✅ Sent</button>
+      </div>
+    </div>
+
+    <!-- Blockers -->
+    <div class="rp-card" id="rp-blockers" style="display:none;">
+      <h4>🚧 Identify Blocker</h4>
+      <div class="blocker-grid">
+        <div class="blocker-btn" onclick="setBlocker('money')">💰 Money</div>
+        <div class="blocker-btn" onclick="setBlocker('belief')">🤔 Belief</div>
+        <div class="blocker-btn" onclick="setBlocker('product')">📦 Product</div>
+        <div class="blocker-btn" onclick="setBlocker('time')">⏰ Time</div>
+      </div>
+      <div id="blockerResponse" style="margin-top:8px;font-size:11px;color:var(--t2);display:none;"></div>
+    </div>
+
+    <!-- 3-Way Call -->
+    <div class="rp-card" id="rp-threeway" style="display:none;">
+      <h4>👥 3-Way Call</h4>
+      <button class="btn btn-sm btn-purple btn-full" onclick="generateThreeWaySetup()">Generate 3-Way Intro</button>
+      <button class="btn btn-sm btn-ghost btn-full" style="margin-top:4px;" onclick="showThreeWayRebuttals()">🛡️ Rebuttals</button>
+      <button class="btn btn-sm btn-ghost btn-full" style="margin-top:4px;" onclick="generatePreCallBrief()">📋 Pre-Call Brief</button>
+      <div id="threeWayContent" style="margin-top:8px;display:none;"></div>
+    </div>
+
+    <!-- Conversation Intelligence -->
+    <div class="rp-card" id="rp-convo-intel" style="display:none;">
+      <h4>📊 Conversation Intel</h4>
+      <div class="rp-row"><span class="label">Messages</span><span class="val" id="ci-msgs">0</span></div>
+      <div class="rp-row"><span class="label">Buying Signals</span><span class="val" style="color:var(--gold);" id="ci-signals">0</span></div>
+      <div class="rp-row"><span class="label">Objections</span><span class="val" id="ci-obj">0</span></div>
+      <div class="rp-row"><span class="label">Blockers</span><span class="val" id="ci-blockers">None</span></div>
+      <div class="rp-row"><span class="label">Warm-Up Stage</span><span class="val" id="ci-warmup">Curiosity</span></div>
+      <div class="rp-row"><span class="label">Next Move</span><span class="val" style="color:var(--green);" id="ci-next">Send opener</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ADD CONTACT MODAL ═══ -->
+<div class="modal-bg" id="addModal">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3>➕ Add Contact</h3>
+      <button onclick="closeModal('addModal')" style="background:none;border:none;color:var(--t2);font-size:18px;cursor:pointer;">✕</button>
+    </div>
+
+    <!-- Step 1: Basic Info — with Contact Picker -->
+    <div class="field">
+      <div class="field-lbl">Name *</div>
+      <div style="display:flex;gap:6px;">
+        <input class="field-in" id="ac-name" placeholder="Their name" style="flex:1;">
+        <button class="btn btn-purple btn-sm" onclick="pickFromPhone()" id="contactPickerBtn" title="Select from phone contacts">📱 Phone</button>
+      </div>
+    </div>
+    <div class="field">
+      <div class="field-lbl">Phone</div>
+      <input class="field-in" id="ac-phone" placeholder="(555) 123-4567">
+    </div>
+
+    <!-- Smart Thread Import — 3 paths -->
+    <div style="background:linear-gradient(135deg,var(--purple-g),var(--blue-g));border:1px solid var(--purple);border-radius:10px;padding:14px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="font-size:12px;font-weight:700;color:var(--purple);display:flex;align-items:center;gap:6px;">🧠 Import Conversation</div>
+        <span style="font-size:9px;color:var(--t3);">AI auto-detects tier, style, interests</span>
+      </div>
+
+      <!-- Import Method Selector -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;">
+        <button class="btn btn-sm btn-ghost" onclick="showImportMethod('file')" id="im-file-btn" style="flex-direction:column;padding:10px;font-size:10px;text-align:center;">
+          <span style="font-size:18px;display:block;">📁</span>Upload File
+          <span style="font-size:8px;color:var(--t3);display:block;">CSV from iMazing</span>
+        </button>
+        <button class="btn btn-sm btn-ghost" onclick="showImportMethod('paste')" id="im-paste-btn" style="flex-direction:column;padding:10px;font-size:10px;text-align:center;border-color:var(--purple);">
+          <span style="font-size:18px;display:block;">📋</span>Paste Text
+          <span style="font-size:8px;color:var(--t3);display:block;">Copy from Messages</span>
+        </button>
+        <button class="btn btn-sm btn-ghost" onclick="showImportMethod('screenshot')" id="im-ss-btn" style="flex-direction:column;padding:10px;font-size:10px;text-align:center;">
+          <span style="font-size:18px;display:block;">📸</span>Screenshots
+          <span style="font-size:8px;color:var(--t3);display:block;">Upload images</span>
+        </button>
+      </div>
+
+      <!-- FILE UPLOAD (iMazing CSV, Android SMS Exporter, TXT) -->
+      <div id="im-file" style="display:none;">
+        <input type="file" id="threadFileInput" accept=".csv,.txt,.xlsx" style="display:none;" onchange="handleFileUpload(event)">
+        <button class="btn btn-purple btn-full btn-sm" onclick="document.getElementById('threadFileInput').click()" style="padding:12px;">
+          📁 Choose CSV or TXT File
+        </button>
+        <div style="margin-top:6px;font-size:9px;color:var(--t3);line-height:1.5;">
+          <strong>iPhone:</strong> Use <a href="https://imazing.com" target="_blank" style="color:var(--purple);">iMazing</a> ($40) → Messages → Select convo → Export as CSV<br>
+          <strong>Android:</strong> Use <a href="https://play.google.com/store/apps/details?id=com.smartpositive.sms_exporter" target="_blank" style="color:var(--purple);">SMS Exporter</a> (free) → Select convo → Export as CSV<br>
+          <strong>Mac:</strong> Messages app → File → Print → Save as PDF (then paste text)
+        </div>
+        <div id="fileUploadStatus" style="display:none;margin-top:8px;padding:8px;background:var(--bg3);border-radius:6px;font-size:11px;"></div>
+      </div>
+
+      <!-- PASTE TEXT (already working) -->
+      <div id="im-paste">
+        <textarea class="field-in" id="ac-thread" rows="4" placeholder="Paste your text conversation here...
+
+Copy from iMessage, WhatsApp, Instagram DM, etc.
+The AI will detect their style, tier, and interests." style="font-size:11px;"></textarea>
+        <button class="btn btn-sm btn-purple" style="margin-top:6px;width:100%;" onclick="analyzeThread()">🧠 Auto-Analyze Thread → Fill Everything</button>
+      </div>
+
+      <!-- SCREENSHOT UPLOAD (Claude Vision) -->
+      <div id="im-screenshot" style="display:none;">
+        <input type="file" id="screenshotInput" accept="image/*" multiple style="display:none;" onchange="handleScreenshots(event)">
+        <button class="btn btn-purple btn-full btn-sm" onclick="document.getElementById('screenshotInput').click()" style="padding:12px;">
+          📸 Upload Conversation Screenshots
+        </button>
+        <div style="margin-top:6px;font-size:9px;color:var(--t3);line-height:1.5;">
+          Take screenshots of your conversation → upload them here.<br>
+          AI reads the text from the images, identifies who said what, and builds the thread.
+        </div>
+        <div id="screenshotPreview" style="display:none;margin-top:8px;display:flex;gap:4px;flex-wrap:wrap;"></div>
+        <div id="screenshotStatus" style="display:none;margin-top:8px;padding:8px;background:var(--bg3);border-radius:6px;font-size:11px;"></div>
+      </div>
+
+      <!-- Analysis Result (shared by all methods) -->
+      <div id="threadAnalysisResult" style="display:none;margin-top:8px;padding:10px;background:var(--bg3);border-radius:8px;font-size:11px;line-height:1.6;"></div>
+    </div>
+
+    <!-- Step 2: Classification -->
+    <div class="field">
+      <div class="field-lbl">Tier *</div>
+      <select class="field-in" id="ac-tier">
+        <option value="t1">👨‍👩‍👧 T1: Family (Mom, Dad, Brother, Sister)</option>
+        <option value="t2">🤝 T2: Close Friend (best friends, call log)</option>
+        <option value="t3">💰 T3: Money-Motivated (crypto, forex, investing)</option>
+        <option value="t4">🏪 T4: Everyone Else (gym, church, neighbor)</option>
+        <option value="t5a">👻 T5A: Old contact (haven't talked in a while)</option>
+        <option value="t5b">🆕 T5B: Just met this week</option>
+        <option value="t5c">❄️ T5C: Cold (lead list, referral, don't know them)</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <div class="field-lbl">Origin (where do they come from?)</div>
+      <select class="field-in" id="ac-origin">
+        <option value="personal">👤 Personal connection</option>
+        <option value="nft">🎨 NFT community</option>
+        <option value="forex">📈 Forex / IML / Trading</option>
+        <option value="susu">🔄 SuSu / Gifting circle</option>
+        <option value="mlm">🏢 MLM / Network marketing</option>
+        <option value="sports">🏈 Sports bettor</option>
+        <option value="referral">🤝 Referral from friend</option>
+        <option value="lead">📋 Lead list / purchased</option>
+        <option value="social">📱 Social media / IG / TikTok</option>
+        <option value="cold">❄️ Cold outreach</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <div class="field-lbl">Relationship Status</div>
+      <select class="field-in" id="ac-rel">
+        <option value="healthy">🟢 Healthy — we're good</option>
+        <option value="dormant">🟡 Dormant — haven't talked in a while</option>
+        <option value="strained">🟠 Strained — some tension/history</option>
+        <option value="damaged">🔴 Damaged — lost money/trust before</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <div class="field-lbl">FORM Notes (Family / Occupation / Recreation / Money)</div>
+      <textarea class="field-in" id="ac-form" rows="2" placeholder="Has 2 kids, works at Amazon, watches NFL, always talking about needing more money..."></textarea>
+      <div style="font-size:9px;color:var(--t3);margin-top:2px;">💡 If you used Smart Import above, this may already be filled in.</div>
+    </div>
+
+    <div class="field">
+      <div class="field-lbl">Intensity Mode</div>
+      <select class="field-in" id="ac-mode">
+        <option value="motivated">⚡ Motivated (5-touch sequence)</option>
+        <option value="casual">🌴 Casual (3-touch sequence)</option>
+        <option value="legend">👑 LEGEND (7-10 touch, RELENTLESS)</option>
+      </select>
+    </div>
+
+    <button class="btn btn-gold btn-full" style="margin-top:8px;padding:12px;" onclick="saveNewContact()">✅ Add to Pipeline & Generate Opener</button>
+  </div>
+</div>
+
+<!-- ═══ BULK IMPORT MODAL ═══ -->
+<div class="modal-bg" id="bulkModal">
+  <div class="modal" style="width:600px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3>📁 Bulk Import — Load All Your Messages</h3>
+      <button onclick="closeModal('bulkModal')" style="background:none;border:none;color:var(--t2);font-size:18px;cursor:pointer;">✕</button>
+    </div>
+
+    <!-- Step 1: Choose Device -->
+    <div id="bulk-step1">
+      <div style="font-size:13px;color:var(--t2);margin-bottom:14px;">Import your entire message history. The AI will auto-classify every contact.</div>
+      
+      <div style="font-size:11px;font-weight:700;color:var(--t3);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">What phone do you have?</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+        <button class="btn btn-ghost" onclick="showBulkPath('iphone')" style="padding:16px;flex-direction:column;font-size:12px;">
+          <span style="font-size:28px;display:block;margin-bottom:4px;">🍎</span>iPhone
+        </button>
+        <button class="btn btn-ghost" onclick="showBulkPath('android')" style="padding:16px;flex-direction:column;font-size:12px;">
+          <span style="font-size:28px;display:block;margin-bottom:4px;">🤖</span>Android
+        </button>
+      </div>
+
+      <!-- iPhone Path -->
+      <div id="bulk-iphone" style="display:none;">
+        <div style="font-size:11px;font-weight:700;color:var(--purple);margin-bottom:8px;">RECOMMENDED: iMazing (Mac or PC)</div>
+        <div style="background:var(--bg3);border-radius:8px;padding:12px;font-size:11px;line-height:1.7;color:var(--t2);margin-bottom:10px;">
+          <strong style="color:var(--t1);">Step 1:</strong> Download iMazing from <a href="https://imazing.com" target="_blank" style="color:var(--purple);">imazing.com</a> ($40, Mac & Windows)<br>
+          <strong style="color:var(--t1);">Step 2:</strong> Connect your iPhone via USB cable<br>
+          <strong style="color:var(--t1);">Step 3:</strong> Click <strong>"Messages"</strong> in iMazing sidebar<br>
+          <strong style="color:var(--t1);">Step 4:</strong> Select ALL conversations (Cmd+A or Ctrl+A)<br>
+          <strong style="color:var(--t1);">Step 5:</strong> Click <strong>"Export"</strong> → Choose <strong>CSV</strong> format<br>
+          <strong style="color:var(--t1);">Step 6:</strong> Save the file → Upload it below
+        </div>
+        <div style="font-size:10px;color:var(--t3);margin-bottom:10px;">
+          💡 <strong>Mac users:</strong> iMazing reads your iCloud Messages backup — no need to connect your phone if Messages syncs to your Mac.<br>
+          💡 <strong>PC users:</strong> iMazing for Windows works identically. Connect iPhone via USB.<br>
+          💡 <strong>WhatsApp too:</strong> iMazing also exports WhatsApp conversations in the same flow.
+        </div>
+      </div>
+
+      <!-- Android Path -->
+      <div id="bulk-android" style="display:none;">
+        <div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:8px;">RECOMMENDED: SMS Exporter (Free)</div>
+        <div style="background:var(--bg3);border-radius:8px;padding:12px;font-size:11px;line-height:1.7;color:var(--t2);margin-bottom:10px;">
+          <strong style="color:var(--t1);">Step 1:</strong> Download <a href="https://play.google.com/store/apps/details?id=com.smartpositive.sms_exporter" target="_blank" style="color:var(--green);">SMS Exporter</a> from Play Store (free)<br>
+          <strong style="color:var(--t1);">Step 2:</strong> Open the app → Tap <strong>"Export"</strong><br>
+          <strong style="color:var(--t1);">Step 3:</strong> Select <strong>ALL conversations</strong><br>
+          <strong style="color:var(--t1);">Step 4:</strong> Choose <strong>CSV</strong> format<br>
+          <strong style="color:var(--t1);">Step 5:</strong> Save or email the file to yourself<br>
+          <strong style="color:var(--t1);">Step 6:</strong> Upload it below
+        </div>
+        <div style="font-size:10px;color:var(--t3);margin-bottom:10px;">
+          💡 <strong>Alternative:</strong> "SMS Backup, Print & Restore" also works (free on Play Store)<br>
+          💡 <strong>WhatsApp:</strong> Open WhatsApp → Settings → Chats → Export Chat → choose "Without Media" → upload the TXT file
+        </div>
+      </div>
+
+      <!-- Upload area (shown after device selection) -->
+      <div id="bulk-upload" style="display:none;">
+        <input type="file" id="bulkFileInput" accept=".csv,.txt,.xlsx" multiple style="display:none;" onchange="processBulkUpload(event)">
+        <button class="btn btn-purple btn-full" onclick="document.getElementById('bulkFileInput').click()" style="padding:14px;font-size:13px;">
+          📁 Upload Your Export File(s)
+        </button>
+        <div style="margin-top:6px;font-size:9px;color:var(--t3);text-align:center;">Accepts CSV, TXT • Multiple files OK</div>
+      </div>
+    </div>
+
+    <!-- Step 2: Processing -->
+    <div id="bulk-step2" style="display:none;">
+      <div style="text-align:center;padding:20px;">
+        <div class="spinner" style="width:24px;height:24px;border-width:3px;margin:0 auto 12px;"></div>
+        <div style="font-size:14px;font-weight:700;" id="bulkProgressTitle">Processing conversations...</div>
+        <div style="margin-top:8px;background:var(--bg3);border-radius:6px;height:8px;overflow:hidden;">
+          <div id="bulkProgressBar" style="height:100%;background:linear-gradient(90deg,var(--purple),var(--gold));width:0%;transition:width 0.3s;border-radius:6px;"></div>
+        </div>
+        <div style="font-size:11px;color:var(--t2);margin-top:6px;" id="bulkProgressText">Reading file...</div>
+      </div>
+    </div>
+
+    <!-- Step 3: Review -->
+    <div id="bulk-step3" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div>
+          <div style="font-size:14px;font-weight:700;" id="bulkReviewTitle">247 contacts found</div>
+          <div style="font-size:11px;color:var(--t2);" id="bulkReviewSub">Review and add to your pipeline</div>
+        </div>
+        <div style="display:flex;gap:4px;">
+          <button class="btn btn-sm btn-green" onclick="addAllBulkProspects()">✅ Add All Prospects</button>
+          <button class="btn btn-sm btn-ghost" onclick="skipAllSpam()">🗑️ Skip Spam</button>
+        </div>
+      </div>
+      <div id="bulkReviewList" style="max-height:400px;overflow-y:auto;display:grid;gap:6px;"></div>
+      <div style="text-align:center;margin-top:12px;">
+        <button class="btn btn-gold btn-full" onclick="finishBulkImport()">✅ Done — Open Pipeline</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// THE BRAIN — Keith's Complete Closing Philosophy (System Prompt)
+// ═══════════════════════════════════════════════════════════════
+const SYSTEM_PROMPT = `You are a ghostwriter for an SBA affiliate. You generate text messages that sound like THE AFFILIATE wrote them — not an AI, not corporate, not Keith. You sound like THEM.
+
+VOICE MATCHING RULES:
+Read the affiliate's previous messages in the conversation thread. Mirror their:
+- Formality level (slang vs professional)
+- Emoji usage (heavy, light, none)
+- Message length (short punchy vs longer paragraphs)
+- Energy level (chill vs hype)
+- Vocabulary and specific phrases they use
+If no previous messages exist, use the tier and relationship to guess their style.
+
+═══ KEITH'S 7-PHASE CLOSING STRATEGY ═══
+
+PHASE 1 — CONTACT CLASSIFICATION:
+The contact's tier determines the approach:
+- T1 Family: Warm, use relationship language (Ma, Sis, Bro, Pops). Lead with love and protection. "I wouldn't bring this to you if it wasn't real."
+- T2 Close Friend: Match energy exactly. Real talk, no filter. Inside jokes. "I'm telling you this because I trust you."
+- T3 Money-Motivated: Lead with numbers/ROI. Business language. Compare to their current hustle. "Here's what the math says..."
+- T4 Acquaintance: Professional but warm. Build trust before selling. Social proof heavy.
+- T5 Cold: Hook fast, value upfront. Credibility markers. Low-pressure, high-curiosity.
+
+PHASE 2 — WARM-UP (Don't go 0 to 100):
+Stage 1: CURIOSITY — No pitch, just intrigue ("Yo, you still betting?")
+Stage 2: PERMISSION — Get them to ask YOU ("Found something crazy... idk if you'd be interested")
+Stage 3: MICRO-COMMITMENT — Small yes before big yes ("Can I send you a 2-min video?")
+Stage 4: VALUE FIRST — Give before asking ("Here's a free play — let me know when it cashes")
+Stage 5: PITCH — Only after engagement ("Ready to get plugged in for real?")
+
+PHASE 3 — THE PARENTING APPROACH:
+Keith's words: "Think of it like a parent with a child. The moment I find out my kid has bad grades, the work begins — at the conference, on the way home, at the dinner table, before bed, next morning. I will be on your neck every day until you show improvement."
+Translation: 10-15 follow-ups. Relentless. "I have to want it just as much as I want you to want it."
+
+PHASE 4 — CLOSING HIERARCHY (in order of priority):
+1. CLOSE NOW VIA TEXT — "are you locking in?"
+2. GET ON THE PHONE — 1-on-1 call
+3. THREE-WAY CALL — bring in upline with "crazy motion"
+4. NIGHTLY ZOOM — group presentation
+5. TRIAL — LAST RESORT only after multiple failed closes
+
+PHASE 5 — DECISION TREE:
+If 1-on-1 didn't close → push 3-way
+If they resist 3-way ("let me see what YOU do first"):
+→ "Me making money doesn't change whether this works. The people ahead of me? They're already proof."
+→ "It's not a sales call. It's a Q&A. They're showing you what they do."
+If 3-way didn't close → identify blocker (Money/Belief/Product/Time)
+If blocker addressed → try close again
+If still resists → offer trial (ONE TIME, last resort)
+
+PHASE 6 — BLOCKER HANDLING:
+💰 Money: "It's $1K for 40 days. That's $25/day — you spend that on DoorDash. But this $25/day turns into $300-500/week BACK to you."
+🤔 Belief: "I'm not asking you to believe ME. Believe the MATH. Steph Curry over 30 on one book, under 30 on another — one HAS to hit."
+📦 Product: "You don't need to know sports. The AI scanner finds plays, calculator tells you what to bet. 20 minutes. Click buttons."
+⏰ Time: "20 minutes a day. That's it. The system does the work. What else makes $300/week in 20 minutes?"
+
+PHASE 7 — KEITH'S ACTUAL LANGUAGE:
+Use phrases like: "are you locking in?", "1000 percent", "I got you", "I promise you", "Don't even look at it like that"
+Positioning: "SBA beats Forex, NFTs, real estate, insurance, startups"
+"I don't need anyone else to make money. But if I bring people in, it's a fortune."
+"I won't be able to stop people from making money; it's 100%"
+
+SBA PRODUCT FACTS:
+- Sports arbitrage: bet both sides on different sportsbooks = guaranteed profit (not gambling)
+- ROI: 5-38% per trade (Double Value Bet strategy), 20 minutes/day
+- Packages: Basic $1K, Plus $2K, Elite $5K, Pro $10K (40-day cycles)
+- VPN add-on $1K (unlocks 20+ offshore books)
+- Members get AI scanner, calculator, training, community, dedicated support
+
+RULES:
+- Write as THE AFFILIATE, not an AI
+- Keep under 150 words — these are TEXT messages
+- End with a question or call to action
+- Match the affiliate's thread style exactly
+- The contact should think their friend wrote this
+- Every message has the intent to close. The quicker they buy, the quicker they make money.
+- When you detect a buying signal, GO FOR THE CLOSE immediately
+- When the conversation has 3+ buying signals, pivot to Zoom/call invite
+- NEVER mention AI, never break character`;
+
+// ═══════════════════════════════════════════════════════════════
+// DATA LAYER
+// ═══════════════════════════════════════════════════════════════
+const STORE='sba_closer_v2';
+const load=()=>{try{return JSON.parse(localStorage.getItem(STORE))||[];}catch(e){return[];}};
+const save=(d)=>localStorage.setItem(STORE,JSON.stringify(d));
+
+const TIER_NAMES={t1:'Family',t2:'Close Friend',t3:'Money-Motivated',t4:'Acquaintance',t5a:'Old Contact',t5b:'Just Met',t5c:'Cold/Lead'};
+const TIER_COLORS={t1:'var(--red)',t2:'var(--orange)',t3:'var(--gold)',t4:'var(--blue)',t5a:'var(--purple)',t5b:'var(--cyan)',t5c:'var(--t3)'};
+const TIER_SHORT={t1:'T1',t2:'T2',t3:'T3',t4:'T4',t5a:'T5',t5b:'T5',t5c:'T5'};
+const ORIGIN_LABELS={personal:'👤 Personal',nft:'🎨 NFT',forex:'📈 Forex',susu:'🔄 SuSu',mlm:'🏢 MLM',sports:'🏈 Sports',referral:'🤝 Referral',lead:'📋 Lead',social:'📱 Social',cold:'❄️ Cold'};
+const REL_LABELS={healthy:'🟢 Healthy',dormant:'🟡 Dormant',strained:'🟠 Strained',damaged:'🔴 Damaged'};
+
+const WARMUP_STAGES=['curiosity','permission','microcommit','value','pitch','call','threeway','zoom','trial','close'];
+const STAGE_ORDER=['new','outreach_sent','followup_1','followup_2','responded','qualified','call_scheduled','call_done','threeway_scheduled','threeway_done','trial_started','trial_d1_3','trial_d4_7','trial_d8_14','close_attempt','converted','hard_no','nurture'];
+const STAGE_LABELS={new:'📥 New',outreach_sent:'📤 Sent',followup_1:'🔄 F/U 1',followup_2:'🔄 F/U 2',responded:'💬 Replied',qualified:'✅ Qualified',call_scheduled:'📅 Call Set',call_done:'📞 Called',threeway_scheduled:'👥 3-Way Set',threeway_done:'🤝 3-Way Done',trial_started:'🎁 Trial',trial_d1_3:'🎁 Trial D1-3',trial_d4_7:'🎁 Trial D4-7',trial_d8_14:'🎁 Trial D8-14',close_attempt:'🎯 Closing',converted:'✅ Converted',hard_no:'❌ Hard No',nurture:'💤 Nurture'};
+const STAGE_COLORS={new:'var(--blue)',outreach_sent:'var(--blue)',followup_1:'var(--blue)',followup_2:'var(--blue)',responded:'var(--orange)',qualified:'var(--green)',call_scheduled:'var(--gold)',call_done:'var(--gold)',threeway_scheduled:'var(--purple)',threeway_done:'var(--purple)',trial_started:'var(--cyan)',trial_d1_3:'var(--cyan)',trial_d4_7:'var(--cyan)',trial_d8_14:'var(--cyan)',close_attempt:'var(--red)',converted:'var(--green)',hard_no:'var(--t3)',nurture:'var(--t3)'};
+
+// Seed demo data
+if(!load().length){
+  save([
+    {id:'c1',name:'Mom',phone:'',tier:'t1',origin:'personal',rel:'healthy',form:'Watches NFL every Sunday, always worried about bills, has diabetes',stage:'new',warmup:'curiosity',mode:'motivated',day:1,thread:[],signals:0,objections:0,blockers:[],created:Date.now()},
+    {id:'c2',name:'Marcus',phone:'',tier:'t2',origin:'sports',rel:'healthy',form:'Best friend, on DraftKings every weekend, lost $2K last year on parlays, has 2 kids',stage:'responded',warmup:'pitch',mode:'legend',day:3,thread:[
+      {who:'me',text:'Yo bro you still doing DraftKings? I found something CRAZY',ts:Date.now()-259200000},
+      {who:'them',text:'lol yeah why whats up',ts:Date.now()-259100000},
+      {who:'me',text:'Bro I found a way to GUARANTEE profit on sports. Not picking winners — its math. Both sides covered. I made $400 this week doing 20 min a day',ts:Date.now()-172800000},
+      {who:'them',text:'That sounds too good to be true bro. What is it exactly?',ts:Date.now()-86400000}
+    ],signals:1,objections:1,blockers:[],created:Date.now()-259200000},
+    {id:'c3',name:'James',phone:'',tier:'t3',origin:'forex',rel:'dormant',form:'Used to trade forex together, made some money then lost it, works at Goldman now, into crypto',stage:'qualified',warmup:'pitch',mode:'motivated',day:4,thread:[
+      {who:'me',text:'James! Long time bro. You still trading?',ts:Date.now()-345600000},
+      {who:'them',text:'Hey! Nah I stopped forex. Doing some crypto on the side. Whats good?',ts:Date.now()-340000000},
+      {who:'me',text:'Perfect timing. I found something with better returns than crypto and its GUARANTEED. Sports arbitrage. Same concept as forex arb but with sportsbooks. You would love the math behind it',ts:Date.now()-259200000},
+      {who:'them',text:'Interesting. What kind of returns we talking?',ts:Date.now()-172800000},
+      {who:'me',text:'5-38% per trade depending on strategy. And thats per TRADE not per year. I can show you the calculator — its insane. When you free to hop on a call?',ts:Date.now()-172700000},
+      {who:'them',text:'Hmm ok. How much to get started though?',ts:Date.now()-86400000}
+    ],signals:3,objections:0,blockers:[],created:Date.now()-345600000},
+    {id:'c4',name:'Amanda',phone:'',tier:'t4',origin:'personal',rel:'healthy',form:'Met at gym, mentioned wanting financial freedom, single mom',stage:'call_scheduled',warmup:'call',mode:'motivated',day:5,thread:[
+      {who:'me',text:'Hey Amanda! Remember when we were talking about financial freedom at the gym?',ts:Date.now()-432000000},
+      {who:'them',text:'Hey! Yeah what about it?',ts:Date.now()-430000000},
+      {who:'me',text:'I found something real. Sports arbitrage — guaranteed profit using math. Not gambling at all. I made $600 this week doing 20 min a day',ts:Date.now()-345600000},
+      {who:'them',text:'That sounds amazing. How does it work?',ts:Date.now()-259200000},
+      {who:'me',text:'Basically two sports apps disagree on the odds for the same game. You bet both sides — one HAS to win right? But because of the gap in odds, you profit no matter what. The app does all the math for you',ts:Date.now()-259100000},
+      {who:'them',text:'Ok that actually makes sense. How much does it cost?',ts:Date.now()-172800000},
+      {who:'me',text:'Starts at $1K for 40 days. Most people make it back first week. Actually we do a Zoom every night at 8 where my mentor shows everything live — way easier to see it than text about it. Tonight work?',ts:Date.now()-172700000},
+      {who:'them',text:'Let me check my schedule. Can I let you know later today?',ts:Date.now()-86400000}
+    ],signals:3,objections:0,blockers:[],created:Date.now()-432000000},
+    {id:'c5',name:'DaVon',phone:'',tier:'t3',origin:'nft',rel:'strained',form:'Old NFT project partner, owes me $500, always chasing the next thing, good hustler though',stage:'outreach_sent',warmup:'curiosity',mode:'casual',day:1,thread:[
+      {who:'me',text:'Yo DaVon... is this still your number?',ts:Date.now()-86400000}
+    ],signals:0,objections:0,blockers:[],created:Date.now()-86400000},
+    {id:'c6',name:'Sarah W',phone:'',tier:'t5c',origin:'referral',rel:'healthy',form:'Marcus friend, into crypto, nurse, good income',stage:'new',warmup:'curiosity',mode:'motivated',day:1,thread:[],signals:0,objections:0,blockers:[],created:Date.now()},
+  ]);
+}
+
+let currentContact = null;
+let currentView = 'closer';
+
+// ═══════════════════════════════════════════════════════════════
+// SIDEBAR RENDERING
+// ═══════════════════════════════════════════════════════════════
+function renderSidebar(){
+  const contacts = load();
+  const q = (document.getElementById('searchContacts')?.value||'').toLowerCase();
+  const filtered = q ? contacts.filter(c=>c.name.toLowerCase().includes(q)) : contacts;
+  
+  // Group by pipeline stage
+  const groups = {};
+  const activeStages = ['new','outreach_sent','followup_1','followup_2','responded','qualified','call_scheduled','call_done','threeway_scheduled','threeway_done','trial_started','trial_d1_3','trial_d4_7','trial_d8_14','close_attempt'];
+  const closedStages = ['converted','hard_no','nurture'];
+  
+  // Active contacts
+  const active = filtered.filter(c=>activeStages.includes(c.stage));
+  const closed = filtered.filter(c=>closedStages.includes(c.stage));
+  
+  // Sort active by: hot leads first, then by day (higher = more urgent)
+  active.sort((a,b)=>(b.signals-a.signals)||(b.day-a.day));
+  
+  let html = '';
+  
+  // Needs action badge
+  const needsAction = active.filter(c=>c.signals>=2||c.stage==='responded'||c.stage==='qualified');
+  if(needsAction.length){
+    html += `<div class="sb-section"><div class="sb-head" style="color:var(--red);">⚠️ NEEDS ACTION <span class="sb-count" style="background:var(--red);color:#fff;">${needsAction.length}</span></div>`;
+    needsAction.forEach(c=>{html+=renderContactCard(c);});
+    html += '</div>';
+  }
+  
+  // Active
+  const rest = active.filter(c=>!needsAction.includes(c));
+  if(rest.length){
+    html += `<div class="sb-section"><div class="sb-head">ACTIVE <span class="sb-count" style="background:var(--gold-g);color:var(--gold);">${rest.length}</span></div>`;
+    rest.forEach(c=>{html+=renderContactCard(c);});
+    html += '</div>';
+  }
+  
+  // Closed
+  if(closed.length){
+    html += `<div class="sb-section"><div class="sb-head">CLOSED <span class="sb-count" style="background:var(--border);color:var(--t2);">${closed.length}</span></div>`;
+    closed.forEach(c=>{html+=renderContactCard(c);});
+    html += '</div>';
+  }
+  
+  document.getElementById('sidebarContacts').innerHTML = html;
+}
+
+function renderContactCard(c){
+  const color = TIER_COLORS[c.tier]||'var(--t3)';
+  const stageColor = STAGE_COLORS[c.stage]||'var(--t3)';
+  const isActive = currentContact?.id === c.id;
+  const signals = c.signals >= 2 ? '🔥'.repeat(Math.min(c.signals,3)) : '';
+  
+  return `<div class="contact-card ${isActive?'active':''}" onclick="selectContact('${c.id}')">
+    <div class="cc-name">
+      <span>${c.name} ${signals}</span>
+      <span class="cc-badge" style="background:${color}22;color:${color};">${TIER_SHORT[c.tier]||'T?'}</span>
+    </div>
+    <div class="cc-meta">
+      <span class="cc-stage" style="background:${stageColor}22;color:${stageColor};">${STAGE_LABELS[c.stage]||c.stage}</span>
+      <span>${ORIGIN_LABELS[c.origin]?.split(' ')[0]||''}</span>
+    </div>
+    ${c.day>0&&c.stage!=='converted'&&c.stage!=='hard_no'?`<div class="cc-due">Day ${c.day} • ${c.mode}</div>`:''}
+  </div>`;
+}
+
+function filterSidebar(){renderSidebar();}
+
+// ═══════════════════════════════════════════════════════════════
+// CONTACT SELECTION & CONVERSATION
+// ═══════════════════════════════════════════════════════════════
+function selectContact(id){
+  currentContact = load().find(c=>c.id===id);
+  if(!currentContact) return;
+  
+  // Switch to closer view
+  if(currentView !== 'closer') switchView('closer', document.querySelector('.top-tab'));
+  
+  // Show convo view, hide empty state
+  document.getElementById('emptyState').style.display = 'none';
+  const cv = document.getElementById('convoView');
+  cv.style.display = 'flex';
+  
+  // Update header
+  const color = TIER_COLORS[currentContact.tier];
+  document.getElementById('convoAvatar').style.background = `${color}22`;
+  document.getElementById('convoAvatar').style.color = color;
+  document.getElementById('convoAvatar').textContent = currentContact.name.charAt(0);
+  document.getElementById('convoName').textContent = currentContact.name;
+  document.getElementById('convoMeta').innerHTML = `
+    <span class="cc-badge" style="background:${color}22;color:${color};">${TIER_NAMES[currentContact.tier]}</span>
+    <span>${ORIGIN_LABELS[currentContact.origin]||''}</span>
+    <span>${REL_LABELS[currentContact.rel]||''}</span>
+    <span style="color:var(--gold);">Day ${currentContact.day}</span>
+  `;
+  
+  // Update warm-up track
+  const wuIdx = WARMUP_STAGES.indexOf(currentContact.warmup);
+  document.querySelectorAll('.wu-step').forEach((s,i)=>{
+    s.className = 'wu-step' + (i < wuIdx ? ' done' : i === wuIdx ? ' current' : '');
+  });
+  
+  // Render thread
+  renderThread();
+  
+  // Update right panel
+  updateRightPanel();
+  
+  // Re-render sidebar to highlight
+  renderSidebar();
+}
+
+function renderThread(){
+  const el = document.getElementById('convoThread');
+  if(!currentContact?.thread?.length){
+    el.innerHTML = `<div style="text-align:center;padding:40px;color:var(--t3);font-size:13px;">
+      No messages yet with ${currentContact.name}.<br>
+      <span style="font-size:11px;color:var(--t2);">Click ⚡ AI to generate your opener based on their tier, origin, and relationship.</span>
+    </div>`;
+    return;
+  }
+  el.innerHTML = currentContact.thread.map(m=>{
+    const time = new Date(m.ts).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+    return `<div class="msg ${m.who==='me'?'sent':'recv'}">
+      <div class="who">${m.who==='me'?'You':currentContact.name}</div>
+      <div class="bubble">${m.text}</div>
+      <div class="ts">${time}</div>
+    </div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RIGHT PANEL UPDATES
+// ═══════════════════════════════════════════════════════════════
+function updateRightPanel(){
+  if(!currentContact) return;
+  const c = currentContact;
+  
+  // Show all panels
+  ['rp-intel','rp-hierarchy','rp-blockers','rp-threeway','rp-convo-intel'].forEach(id=>{
+    document.getElementById(id).style.display = 'block';
+  });
+  
+  // Intel
+  document.getElementById('rpIntelContent').innerHTML = `
+    <div class="rp-row"><span class="label">Tier</span><span class="val" style="color:${TIER_COLORS[c.tier]};">${TIER_NAMES[c.tier]}</span></div>
+    <div class="rp-row"><span class="label">Origin</span><span class="val">${ORIGIN_LABELS[c.origin]||c.origin}</span></div>
+    <div class="rp-row"><span class="label">Relationship</span><span class="val">${REL_LABELS[c.rel]||c.rel}</span></div>
+    <div class="rp-row"><span class="label">Stage</span><span class="val" style="color:${STAGE_COLORS[c.stage]};">${STAGE_LABELS[c.stage]}</span></div>
+    <div class="rp-row"><span class="label">Mode</span><span class="val">${c.mode==='legend'?'👑 LEGEND':c.mode==='casual'?'🌴 Casual':'⚡ Motivated'}</span></div>
+    ${c.form?`<div style="margin-top:6px;padding:6px 8px;background:var(--bg3);border-radius:6px;font-size:10px;color:var(--t2);line-height:1.5;"><strong style="color:var(--t1);">FORM:</strong> ${c.form}</div>`:''}
+  `;
+  
+  // Hierarchy - highlight current position
+  const isHot = c.signals >= 2 || c.stage === 'qualified' || c.stage === 'call_scheduled';
+  const isCallPhase = c.stage.includes('call') || c.stage.includes('threeway');
+  const isTrialPhase = c.stage.includes('trial');
+  
+  let hierarchyAction = 'Send your opener message to start the conversation.';
+  if(c.signals >= 3) hierarchyAction = '🔥 STRONG buying signals — GO FOR THE CLOSE NOW. Get them on a call or Zoom tonight.';
+  else if(c.signals >= 2) hierarchyAction = '🎯 Ready to escalate. Push for phone call or Zoom invite.';
+  else if(c.signals >= 1) hierarchyAction = 'Interest detected. Keep building value, push toward permission stage.';
+  else if(c.thread?.length > 0) hierarchyAction = 'Follow up. Keep the parenting approach — don\'t let them cool off.';
+  document.getElementById('hierarchyAction').textContent = hierarchyAction;
+  
+  // Convo intel
+  document.getElementById('ci-msgs').textContent = c.thread?.length || 0;
+  document.getElementById('ci-signals').textContent = c.signals + (c.signals ? ' 🔥'.repeat(Math.min(c.signals,3)) : '');
+  document.getElementById('ci-obj').textContent = c.objections;
+  document.getElementById('ci-blockers').textContent = c.blockers?.length ? c.blockers.join(', ') : 'None';
+  document.getElementById('ci-warmup').textContent = c.warmup;
+  document.getElementById('ci-next').textContent = hierarchyAction.substring(0,50);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AI GENERATION (Claude API — Option B)
+// ═══════════════════════════════════════════════════════════════
+async function aiGenerate(){
+  if(!currentContact) return;
+  const c = currentContact;
+  const reply = document.getElementById('replyInput')?.value||'';
+  
+  // Show loading in suggestion
+  document.getElementById('rp-suggestion').style.display = 'block';
+  document.getElementById('suggText').innerHTML = '<div class="spinner"></div> Generating in your voice...';
+  
+  const userMsg = `CONTACT: ${c.name}
+TIER: ${TIER_NAMES[c.tier]} (${(c.tier||'').toUpperCase()})
+ORIGIN: ${ORIGIN_LABELS[c.origin]||c.origin}
+RELATIONSHIP: ${REL_LABELS[c.rel]||c.rel}
+FORM NOTES: ${c.form||'none'}
+WARM-UP STAGE: ${c.warmup}
+INTENSITY MODE: ${c.mode}
+DAY IN SEQUENCE: ${c.day}
+BUYING SIGNALS SO FAR: ${c.signals}
+BLOCKERS IDENTIFIED: ${c.blockers?.join(', ')||'none'}
+
+CONVERSATION THREAD (read MY messages to learn how I write):
+${c.thread?.length ? c.thread.map(m=>`${m.who==='me'?'ME':'THEM'}: ${m.text}`).join('\n') : '(No messages yet — generate an opener for the current warm-up stage: '+c.warmup+')'}
+${reply ? `\nTHEIR LATEST REPLY: ${reply}` : ''}
+
+Generate the next message I should send to ${c.name}. Sound like ME based on my previous messages. Follow Keith's strategy for this warm-up stage. Just the message text, nothing else.`;
+
+  try{
+    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,system:SYSTEM_PROMPT,messages:[{role:'user',content:userMsg}]})
+    });
+    const data = await resp.json();
+    const text = data.content?.[0]?.text;
+    if(text){
+      showSuggestion(text);
+    } else {
+      document.getElementById('suggText').textContent = 'Could not generate. Try the template engine or try again.';
+    }
+  }catch(e){
+    console.error('AI error:',e);
+    document.getElementById('suggText').textContent = 'Connection error. Check network and try again.';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REPLY ANALYSIS
+// ═══════════════════════════════════════════════════════════════
+const DETECT_PATTERNS = {
+  buying_signal: {keywords:['interesting','sounds good','tell me more','how does','show me','sign me up','im in','lets do','ready','want to','curious','send me','link','how much','cost','price','when can','tonight','free','open to'],label:'🔥 BUYING SIGNAL',color:'var(--green)'},
+  skepticism: {keywords:['guaranteed','too good','scam','sounds like','believe','trust','real','legit','ponzi','pyramid','scheme'],label:'🛡️ Skepticism',color:'var(--orange)'},
+  gambling: {keywords:['gambling','gamble','betting','bet','lose','lost','risk','risky','uncle','brother lost','friend lost'],label:'🎰 Gambling Concern',color:'var(--red)'},
+  money: {keywords:['expensive','afford','dont have','no money','broke','tight','budget','cant pay','credit'],label:'💰 Money Blocker',color:'var(--gold)'},
+  time: {keywords:['busy','time','schedule','dont have time','no time','hours','kids','work schedule'],label:'⏰ Time Blocker',color:'var(--blue)'},
+  resistance: {keywords:['not interested','im good','nah','no thanks','pass','dont want','stop','leave me'],label:'❌ Resistance',color:'var(--red)'},
+  threeway_resist: {keywords:['dont want to talk','see what you do','show me first','dont need to talk','just send info','send me info'],label:'🛡️ 3-Way Resistance',color:'var(--purple)'},
+  thinking: {keywords:['think about','let me think','sleep on','consider','not sure','maybe','might','possibly'],label:'🤔 Stalling',color:'var(--orange)'}
+};
+
+function analyzeReply(){
+  const reply = document.getElementById('replyInput')?.value?.trim();
+  if(!reply || !currentContact) return;
+  
+  // Save to thread
+  const contacts = load();
+  const c = contacts.find(x=>x.id===currentContact.id);
+  if(c){
+    c.thread.push({who:'them',text:reply,ts:Date.now()});
+    
+    // Detect patterns
+    const lower = reply.toLowerCase();
+    let detections = [];
+    for(const[type,data] of Object.entries(DETECT_PATTERNS)){
+      const matched = data.keywords.filter(k=>lower.includes(k));
+      if(matched.length) detections.push({type,...data,matched});
+    }
+    
+    // Update signals/objections
+    const hasBuySignal = detections.some(d=>d.type==='buying_signal');
+    if(hasBuySignal) c.signals++;
+    
+    const hasObjection = detections.some(d=>['skepticism','gambling','money','time','resistance','thinking'].includes(d.type));
+    if(hasObjection) c.objections++;
+    
+    // Update blockers
+    if(detections.some(d=>d.type==='money') && !c.blockers.includes('💰 Money')) c.blockers.push('💰 Money');
+    if(detections.some(d=>d.type==='time') && !c.blockers.includes('⏰ Time')) c.blockers.push('⏰ Time');
+    
+    // Advance stage if responded
+    if(c.stage === 'outreach_sent' || c.stage === 'followup_1' || c.stage === 'followup_2'){
+      c.stage = 'responded';
+    }
+    if(hasBuySignal && c.signals >= 2) c.stage = 'qualified';
+    
+    // Advance warmup
+    if(c.warmup === 'curiosity' && reply.length > 5) c.warmup = 'permission';
+    if(hasBuySignal && WARMUP_STAGES.indexOf(c.warmup) < WARMUP_STAGES.indexOf('pitch')) c.warmup = 'pitch';
+    
+    save(contacts);
+    currentContact = c;
+    renderThread();
+    updateRightPanel();
+    renderSidebar();
+    
+    // Show analysis
+    const analysisEl = document.getElementById('rp-analysis');
+    analysisEl.style.display = 'block';
+    document.getElementById('rpAnalysis').innerHTML = `
+      <div style="margin-bottom:6px;">${detections.map(d=>`<span class="det-tag" style="background:${d.color}22;color:${d.color};">${d.label}</span>`).join('')||'<span class="det-tag" style="background:var(--blue-g);color:var(--blue);">💬 Engaged</span>'}</div>
+      <div style="font-size:11px;color:var(--t2);line-height:1.5;">${
+        hasBuySignal ? '🎯 BUYING SIGNAL — They\'re interested. Push for the close or escalate to call/Zoom.' :
+        detections.length ? `Strategy: ${detections[0].type==='skepticism'?'Validate concern, separate from gambling, math proof':detections[0].type==='money'?'Break down $25/day, show ROI, payment options':detections[0].type==='gambling'?'Separate from betting — this is MATH, both sides covered':detections[0].type==='time'?'20 min/day, show hourly rate equivalent':detections[0].type==='thinking'?'Don\'t give time — "What specifically do you need to think about?"':detections[0].type==='threeway_resist'?'Use 3-way rebuttals — "It\'s not a sales call, it\'s a Q&A"':'Keep engaging'}` :
+        'They\'re engaged but no clear signal. Keep building value and trust.'
+      }</div>
+    `;
+    
+    // Auto-generate response via AI
+    aiGenerate();
+  }
+  
+  document.getElementById('replyInput').value = '';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUGGESTION MANAGEMENT
+// ═══════════════════════════════════════════════════════════════
+function showSuggestion(text){
+  document.getElementById('rp-suggestion').style.display = 'block';
+  document.getElementById('suggText').textContent = text;
+}
+
+function copySugg(){
+  const text = document.getElementById('suggText').textContent;
+  navigator.clipboard?.writeText(text);
+  showToast('📋 Copied to clipboard!');
+}
+
+function markSent(){
+  const text = document.getElementById('suggText').textContent;
+  if(!text || !currentContact) return;
+  
+  const contacts = load();
+  const c = contacts.find(x=>x.id===currentContact.id);
+  if(c){
+    c.thread.push({who:'me',text,ts:Date.now()});
+    c.day++;
+    
+    // Advance stage
+    if(c.stage === 'new') c.stage = 'outreach_sent';
+    if(c.stage === 'outreach_sent' && c.day >= 3) c.stage = 'followup_1';
+    
+    // Advance warmup
+    const wuIdx = WARMUP_STAGES.indexOf(c.warmup);
+    if(wuIdx < WARMUP_STAGES.indexOf('pitch') && c.thread.filter(m=>m.who==='me').length >= 2){
+      c.warmup = WARMUP_STAGES[Math.min(wuIdx+1, WARMUP_STAGES.length-1)];
+    }
+    
+    save(contacts);
+    currentContact = c;
+    renderThread();
+    updateRightPanel();
+    renderSidebar();
+  }
+  
+  document.getElementById('rp-suggestion').style.display = 'none';
+  document.getElementById('rp-analysis').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BLOCKER HANDLING
+// ═══════════════════════════════════════════════════════════════
+function setBlocker(type){
+  document.querySelectorAll('.blocker-btn').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+  
+  const responses = {
+    money: `💰 MONEY BLOCKER RESPONSE:\n\n"It's $1,000 for 40 days. That's $25/day — you spend that on DoorDash. But this $25/day turns into $300-500/week coming BACK to you. It pays for itself in the first week.\n\nAnd if $1K is tight right now, when do you get paid next? Because the sooner you start, the sooner that money starts working for you."`,
+    belief: `🤔 BELIEF BLOCKER RESPONSE:\n\n"I'm not asking you to believe ME. Believe the MATH.\n\nSteph Curry over 30 on one app, under 30 on another. He either goes over or under — no third option. You bet both sides. One HAS to win. The math means you profit either way.\n\nThis isn't an opinion. It's a scenario. Want me to show you the calculator?"`,
+    product: `📦 PRODUCT BLOCKER RESPONSE:\n\n"You don't need to know sports AT ALL. The AI scanner finds the plays. The calculator tells you exactly what to bet. You click buttons for 20 minutes.\n\nIf you can order DoorDash, you can do this. Want me to show you a quick walkthrough?"`,
+    time: `⏰ TIME BLOCKER RESPONSE:\n\n"20 minutes a day. That's it. The scanner runs 24/7 — it finds everything. You just execute.\n\nLet me put it this way: what else makes you $300-500 a week in 20 minutes of work? That's $900-1,500 an hour effective rate.\n\nWhen do you have 20 minutes? Before bed? Lunch break? I'll show you how fast it is."`
+  };
+  
+  const el = document.getElementById('blockerResponse');
+  el.style.display = 'block';
+  el.innerHTML = `<div style="white-space:pre-wrap;line-height:1.6;">${responses[type]||''}</div>
+    <button class="btn btn-sm btn-gold" style="margin-top:8px;" onclick="navigator.clipboard?.writeText(this.parentElement.querySelector('div').textContent);showToast('Copied!');">📋 Copy</button>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 3-WAY CALL SYSTEM
+// ═══════════════════════════════════════════════════════════════
+function generateThreeWaySetup(){
+  if(!currentContact) return;
+  const c = currentContact;
+  const text = `Hey ${c.name}, I have someone who can explain this way better than me — they've been doing this for a while and their results are insane. It's not a sales pitch, just a quick Q&A so you can hear it from someone who's actually living it. Can I add them to the call real quick?`;
+  
+  document.getElementById('threeWayContent').style.display = 'block';
+  document.getElementById('threeWayContent').innerHTML = `
+    <div style="font-size:11px;color:var(--t2);line-height:1.6;padding:8px;background:var(--bg3);border-radius:6px;margin-bottom:6px;">${text}</div>
+    <button class="btn btn-sm btn-gold" onclick="navigator.clipboard?.writeText('${text.replace(/'/g,"\\'")}');showToast('Copied!');">📋 Copy</button>
+  `;
+}
+
+function showThreeWayRebuttals(){
+  const rebuttals = [
+    {obj:'"Let me see what YOU do first"',resp:'"Me making money doesn\'t change whether this works. The people ahead of me? They\'re already proof. Let me connect you with them — 5 minutes."'},
+    {obj:'"I don\'t want to talk to anyone"',resp:'"It\'s not a sales call bro. It\'s a Q&A. You can ask anything. They\'re not trying to convince you — they\'re showing you what they do."'},
+    {obj:'"Just send me info"',resp:'"Info won\'t answer YOUR questions. 5 minutes on the phone beats an hour of videos. What time works?"'},
+    {obj:'"I want to do my own research"',resp:'"I respect that. But what if you could research AND talk to someone who does this daily? Best of both worlds. 5 minutes — no pressure."'}
+  ];
+  
+  document.getElementById('threeWayContent').style.display = 'block';
+  document.getElementById('threeWayContent').innerHTML = rebuttals.map(r=>`
+    <div style="padding:8px;background:var(--bg3);border-radius:6px;margin-bottom:4px;border-left:2px solid var(--purple);">
+      <div style="font-size:10px;font-weight:700;color:var(--purple);margin-bottom:4px;">${r.obj}</div>
+      <div style="font-size:11px;color:var(--t2);line-height:1.5;">${r.resp}</div>
+    </div>
+  `).join('');
+}
+
+function generatePreCallBrief(){
+  if(!currentContact) return;
+  const c = currentContact;
+  const theirMsgs = (c.thread||[]).filter(m=>m.who==='them').map(m=>m.text.toLowerCase());
+  const askedPrice = theirMsgs.some(m=>m.includes('how much')||m.includes('cost')||m.includes('price'));
+  const askedHow = theirMsgs.some(m=>m.includes('how does')||m.includes('how it')||m.includes('explain'));
+  
+  const brief = `📋 PRE-CALL BRIEF: ${c.name}
+━━━━━━━━━━━━━━━━━━━━━━
+Tier: ${TIER_NAMES[c.tier]}
+Origin: ${ORIGIN_LABELS[c.origin]||c.origin}
+Relationship: ${REL_LABELS[c.rel]}
+FORM: ${c.form||'No notes'}
+Messages: ${c.thread?.length||0}
+Signals: ${c.signals} 🔥
+Blockers: ${c.blockers?.join(', ')||'None identified'}
+
+WHAT THEY ASKED ABOUT:
+${askedPrice?'• 💰 Price — ready to hear numbers':''}
+${askedHow?'• ❓ How it works — needs the math demo':''}
+${c.signals>=2?'• Strong interest — don\'t over-explain, demo & close':''}
+
+WHAT TO DO:
+• Show the live scanner finding a real arb
+• Run the calculator with real numbers
+• Close with: "Which package fits your goals?"
+
+WHAT TO AVOID:
+• Don't over-explain if they're already interested
+• Don't let the call end without an ask
+• Don't give them "time to think" — close tonight`;
+
+  document.getElementById('threeWayContent').style.display = 'block';
+  document.getElementById('threeWayContent').innerHTML = `
+    <div style="font-size:10px;color:var(--t2);line-height:1.6;padding:8px;background:var(--bg3);border-radius:6px;white-space:pre-wrap;font-family:'JetBrains Mono';">${brief}</div>
+    <button class="btn btn-sm btn-gold" style="margin-top:6px;" onclick="navigator.clipboard?.writeText(\`${brief.replace(/`/g,'\\`')}\`);showToast('Brief copied!');">📋 Copy Brief</button>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BULK IMPORT SYSTEM
+// ═══════════════════════════════════════════════════════════════
+let bulkContacts = [];
+
+function openBulkImport(){document.getElementById('bulkModal').classList.add('open');}
+
+function showBulkPath(device){
+  document.getElementById('bulk-iphone').style.display=device==='iphone'?'block':'none';
+  document.getElementById('bulk-android').style.display=device==='android'?'block':'none';
+  document.getElementById('bulk-upload').style.display='block';
+}
+
+async function processBulkUpload(event){
+  const files=Array.from(event.target.files);
+  if(!files.length)return;
+  
+  // Switch to processing view
+  document.getElementById('bulk-step1').style.display='none';
+  document.getElementById('bulk-step2').style.display='block';
+  
+  const progressBar=document.getElementById('bulkProgressBar');
+  const progressText=document.getElementById('bulkProgressText');
+  const progressTitle=document.getElementById('bulkProgressTitle');
+  
+  // Read all files
+  progressText.textContent=`Reading ${files.length} file(s)...`;
+  progressBar.style.width='10%';
+  
+  let allMessages=[];
+  for(const file of files){
+    const text=await new Promise((res,rej)=>{
+      const r=new FileReader();
+      r.onload=()=>res(r.result);
+      r.onerror=()=>rej('Read error');
+      r.readAsText(file);
+    });
+    
+    const ext=file.name.split('.').pop().toLowerCase();
+    if(ext==='csv') allMessages.push(...parseCSV(text));
+    else if(ext==='txt') allMessages.push(...parseTXT(text));
+  }
+  
+  progressBar.style.width='30%';
+  progressText.textContent=`Found ${allMessages.length} total messages. Grouping by contact...`;
+  
+  // Group messages by sender/phone number
+  const conversations={};
+  for(const msg of allMessages){
+    // Group by the other person's name/number
+    const key=msg.who==='them'?(msg.senderName||'unknown'):'_me_';
+    if(key==='_me_')continue; // Skip our own messages for grouping
+    
+    if(!conversations[key])conversations[key]={name:key,messages:[],phone:''};
+    conversations[key].messages.push(msg);
+  }
+  
+  // Also group "me" messages back into the right conversations by timestamp proximity
+  const meMessages=allMessages.filter(m=>m.who==='me');
+  for(const me of meMessages){
+    // Find the conversation with the closest "them" message by timestamp
+    let bestKey=null,bestDiff=Infinity;
+    for(const[key,convo] of Object.entries(conversations)){
+      for(const tm of convo.messages){
+        const diff=Math.abs(tm.ts-me.ts);
+        if(diff<bestDiff){bestDiff=diff;bestKey=key;}
+      }
+    }
+    if(bestKey&&bestDiff<3600000){ // Within 1 hour
+      conversations[bestKey].messages.push(me);
+    }
+  }
+  
+  // Sort each conversation's messages by timestamp
+  for(const convo of Object.values(conversations)){
+    convo.messages.sort((a,b)=>a.ts-b.ts);
+  }
+  
+  const convoList=Object.values(conversations).filter(c=>c.messages.length>=1);
+  convoList.sort((a,b)=>b.messages.length-a.messages.length); // Most messages first
+  
+  progressBar.style.width='50%';
+  progressTitle.textContent=`${convoList.length} conversations found`;
+  progressText.textContent=`AI classifying contacts... (${convoList.length} to process)`;
+  
+  // AI classify each conversation (batch — process in chunks of 5)
+  bulkContacts=[];
+  const batchSize=5;
+  for(let i=0;i<convoList.length;i+=batchSize){
+    const batch=convoList.slice(i,i+batchSize);
+    const pct=50+Math.round((i/convoList.length)*45);
+    progressBar.style.width=pct+'%';
+    progressText.textContent=`Classifying ${i+1}-${Math.min(i+batchSize,convoList.length)} of ${convoList.length}...`;
+    
+    // Process batch in parallel
+    const results=await Promise.all(batch.map(convo=>classifyContact(convo)));
+    bulkContacts.push(...results);
+  }
+  
+  progressBar.style.width='100%';
+  progressText.textContent='Done!';
+  
+  // Switch to review view
+  setTimeout(()=>{
+    document.getElementById('bulk-step2').style.display='none';
+    document.getElementById('bulk-step3').style.display='block';
+    renderBulkReview();
+  },500);
+}
+
+async function classifyContact(convo){
+  // Build a summary of the conversation for Claude
+  const recentMessages=convo.messages.slice(-20); // Last 20 messages
+  const threadSummary=recentMessages.map(m=>`${m.who==='me'?'Me':'Them'}: ${m.text}`).join('\n');
+  
+  const base={
+    name:convo.name,
+    phone:convo.phone,
+    messageCount:convo.messages.length,
+    messages:convo.messages,
+    tier:'t4',
+    origin:'personal',
+    rel:'healthy',
+    form:'',
+    warmth:5,
+    isProspect:'maybe',
+    insight:'',
+    skip:false
+  };
+  
+  // Skip very short conversations (likely spam)
+  if(convo.messages.length<=2||threadSummary.length<30){
+    base.isProspect='no';
+    base.insight='Very few messages — likely not a close contact';
+    base.skip=true;
+    return base;
+  }
+  
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:400,
+        messages:[{role:'user',content:`Classify this text message contact for a sports betting arbitrage sales pipeline. Respond ONLY in JSON:
+
+{"tier":"t1 or t2 or t3 or t4 or t5a or t5b or t5c","origin":"personal or nft or forex or susu or mlm or sports or referral or social or cold","rel":"healthy or dormant or strained or damaged","form":"brief FORM notes - family, occupation, recreation, money clues","warmth":1-10,"isProspect":"yes or maybe or no","insight":"one sentence key insight for closing"}
+
+Contact name: ${convo.name}
+Total messages: ${convo.messages.length}
+Recent conversation:
+${threadSummary}`}]
+      })
+    });
+    const data=await resp.json();
+    const text=data.content?.[0]?.text||'';
+    const clean=text.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+    return {...base,...parsed};
+  }catch(e){
+    // Fallback: basic heuristic classification
+    const allText=threadSummary.toLowerCase();
+    if(allText.includes('mom')||allText.includes('love you')||allText.includes('dinner'))base.tier='t1';
+    else if(allText.includes('bro')||allText.includes('lol')||allText.includes('hang'))base.tier='t2';
+    else if(allText.includes('invest')||allText.includes('crypto')||allText.includes('money'))base.tier='t3';
+    base.isProspect=convo.messages.length>5?'maybe':'no';
+    return base;
+  }
+}
+
+function renderBulkReview(){
+  const prospects=bulkContacts.filter(c=>c.isProspect!=='no');
+  const spam=bulkContacts.filter(c=>c.isProspect==='no');
+  
+  document.getElementById('bulkReviewTitle').textContent=`${bulkContacts.length} contacts found`;
+  document.getElementById('bulkReviewSub').textContent=`${prospects.length} prospects • ${spam.length} skipped (spam/low value)`;
+  
+  const list=document.getElementById('bulkReviewList');
+  list.innerHTML=bulkContacts.map((c,i)=>{
+    const color=TIER_COLORS[c.tier]||'var(--t3)';
+    const relColor=c.rel==='healthy'?'var(--green)':c.rel==='damaged'?'var(--red)':c.rel==='strained'?'var(--orange)':'var(--gold)';
+    const prospectBadge=c.isProspect==='yes'?'<span style="color:var(--green);font-weight:700;">🔥 Prospect</span>':c.isProspect==='maybe'?'<span style="color:var(--gold);">🤔 Maybe</span>':'<span style="color:var(--t3);">⏭️ Skip</span>';
+    
+    return `<div style="background:var(--card);border:1px solid ${c.skip?'var(--border)':color};border-radius:8px;padding:10px;${c.skip?'opacity:0.4;':''}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input class="field-in" value="${c.name}" onchange="bulkContacts[${i}].name=this.value" style="width:140px;padding:4px 8px;font-size:12px;font-weight:700;">
+          <span style="font-size:9px;padding:2px 6px;border-radius:3px;background:${color}22;color:${color};font-weight:700;">${TIER_NAMES[c.tier]||c.tier}</span>
+          <span style="font-size:9px;color:${relColor};">${REL_LABELS[c.rel]?.split(' ')[0]||''}</span>
+          ${prospectBadge}
+        </div>
+        <div style="font-size:10px;color:var(--t3);">${c.messageCount} msgs</div>
+      </div>
+      <div style="font-size:10px;color:var(--t2);margin-bottom:6px;display:flex;gap:8px;">
+        <span>${ORIGIN_LABELS[c.origin]||c.origin}</span>
+        <span>Warmth: ${c.warmth}/10</span>
+      </div>
+      ${c.insight?`<div style="font-size:10px;color:var(--gold);margin-bottom:6px;">💡 ${c.insight}</div>`:''}
+      ${c.form?`<div style="font-size:9px;color:var(--t3);margin-bottom:6px;">${c.form}</div>`:''}
+      <div style="display:flex;gap:4px;">
+        <select class="field-in" style="width:auto;padding:3px 6px;font-size:9px;" onchange="bulkContacts[${i}].tier=this.value">
+          ${Object.entries(TIER_NAMES).map(([k,v])=>`<option value="${k}" ${k===c.tier?'selected':''}>${v}</option>`).join('')}
+        </select>
+        <button class="btn btn-sm ${c.skip?'btn-green':'btn-ghost'}" onclick="toggleBulkSkip(${i})" style="font-size:9px;">${c.skip?'✅ Add Back':'⏭️ Skip'}</button>
+        <button class="btn btn-sm btn-ghost" onclick="previewBulkThread(${i})" style="font-size:9px;">👁️ Preview</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleBulkSkip(i){
+  bulkContacts[i].skip=!bulkContacts[i].skip;
+  renderBulkReview();
+}
+
+function previewBulkThread(i){
+  const c=bulkContacts[i];
+  const preview=c.messages.slice(-10).map(m=>`${m.who==='me'?'You':c.name}: ${m.text}`).join('\n');
+  alert(`Last 10 messages with ${c.name}:\n\n${preview}`);
+}
+
+function addAllBulkProspects(){
+  bulkContacts.forEach(c=>{
+    if(c.isProspect==='no')c.skip=true;
+  });
+  renderBulkReview();
+  showToast(`Marked ${bulkContacts.filter(c=>!c.skip).length} as prospects`);
+}
+
+function skipAllSpam(){
+  bulkContacts.forEach(c=>{
+    if(c.isProspect==='no'||c.messageCount<=2)c.skip=true;
+  });
+  renderBulkReview();
+  showToast(`Skipped ${bulkContacts.filter(c=>c.skip).length} low-value contacts`);
+}
+
+function finishBulkImport(){
+  const contacts=load();
+  const toAdd=bulkContacts.filter(c=>!c.skip);
+  
+  for(const c of toAdd){
+    contacts.push({
+      id:'c'+Date.now()+Math.random().toString(36).substr(2,4),
+      name:c.name,
+      phone:c.phone,
+      tier:c.tier,
+      origin:c.origin,
+      rel:c.rel,
+      form:c.form||'',
+      stage:'new',
+      warmup:'curiosity',
+      mode:c.warmth>=7?'motivated':'casual',
+      day:1,
+      thread:c.messages.map(m=>({who:m.who,text:m.text,ts:m.ts})),
+      signals:0,
+      objections:0,
+      blockers:[],
+      created:Date.now()
+    });
+  }
+  
+  save(contacts);
+  closeModal('bulkModal');
+  
+  // Reset modal for next use
+  document.getElementById('bulk-step1').style.display='block';
+  document.getElementById('bulk-step2').style.display='none';
+  document.getElementById('bulk-step3').style.display='none';
+  
+  renderSidebar();
+  showToast(`🚀 ${toAdd.length} contacts added to pipeline!`);
+  
+  // Switch to pipeline view to see them all
+  switchView('pipeline',document.querySelectorAll('.top-tab')[1]);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// IMPORT METHOD SWITCHER
+// ═══════════════════════════════════════════════════════════════
+function showImportMethod(method){
+  ['file','paste','screenshot'].forEach(m=>{
+    const el=document.getElementById('im-'+m);
+    const btn=document.getElementById('im-'+m+'-btn');
+    if(el)el.style.display=m===method?'block':'none';
+    if(btn)btn.style.borderColor=m===method?'var(--purple)':'var(--border)';
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FILE UPLOAD PARSER (iMazing CSV, Android SMS Exporter, TXT)
+// ═══════════════════════════════════════════════════════════════
+function handleFileUpload(event){
+  const file=event.target.files[0];
+  if(!file)return;
+  
+  const statusEl=document.getElementById('fileUploadStatus');
+  statusEl.style.display='block';
+  statusEl.innerHTML='<div class="spinner"></div> Reading file...';
+  
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const text=e.target.result;
+    const ext=file.name.split('.').pop().toLowerCase();
+    
+    let messages=[];
+    let contactName='';
+    
+    if(ext==='csv'){
+      messages=parseCSV(text);
+    }else if(ext==='txt'){
+      messages=parseTXT(text);
+    }else{
+      statusEl.innerHTML='<span style="color:var(--orange);">⚠️ Unsupported format. Use CSV or TXT.</span>';
+      return;
+    }
+    
+    if(messages.length===0){
+      statusEl.innerHTML='<span style="color:var(--orange);">⚠️ No messages found. Check the file format.</span>';
+      return;
+    }
+    
+    // Detect the other person's name (most common non-"Me" sender)
+    const senders=messages.filter(m=>m.who==='them').map(m=>m.senderName||'Unknown');
+    if(senders.length){
+      const freq={};
+      senders.forEach(s=>{freq[s]=(freq[s]||0)+1;});
+      contactName=Object.entries(freq).sort((a,b)=>b[1]-a[1])[0][0];
+    }
+    
+    // Auto-fill name if empty
+    if(contactName&&contactName!=='Unknown'&&!document.getElementById('ac-name').value){
+      document.getElementById('ac-name').value=contactName;
+    }
+    
+    // Put parsed messages into the thread textarea for AI analysis
+    const threadText=messages.map(m=>`${m.who==='me'?'Me':contactName||'Them'}: ${m.text}`).join('\n');
+    document.getElementById('ac-thread').value=threadText;
+    
+    statusEl.innerHTML=`
+      <span style="color:var(--green);font-weight:700;">✅ Imported ${messages.length} messages</span>
+      ${contactName?`<span style="margin-left:8px;">Contact: <strong>${contactName}</strong></span>`:''}
+      <div style="margin-top:4px;font-size:10px;color:var(--t2);">Thread loaded. Click "🧠 Auto-Analyze" below to detect tier, style, and interests.</div>
+    `;
+    
+    // Store parsed messages for later use
+    window._importedMessages=messages;
+    
+    // Switch to paste view to show the loaded text + analyze button
+    showImportMethod('paste');
+    
+    showToast(`📁 Imported ${messages.length} messages from ${file.name}`);
+  };
+  reader.readAsText(file);
+}
+
+function parseCSV(text){
+  const lines=text.split('\n').filter(l=>l.trim());
+  if(lines.length<2)return[];
+  
+  // Parse header
+  const header=parseCSVLine(lines[0]).map(h=>h.toLowerCase().trim());
+  
+  // Detect column indices based on common formats
+  const dateCol=header.findIndex(h=>h.includes('date')||h.includes('time'));
+  const senderCol=header.findIndex(h=>h.includes('sender')||h.includes('from')||h.includes('address')||h.includes('number'));
+  const textCol=header.findIndex(h=>h.includes('text')||h.includes('message')||h.includes('body'));
+  const typeCol=header.findIndex(h=>h==='type'||h.includes('direction'));
+  
+  if(textCol===-1)return[]; // Can't find message column
+  
+  const messages=[];
+  const myIdentifiers=new Set();
+  
+  for(let i=1;i<lines.length;i++){
+    const cols=parseCSVLine(lines[i]);
+    if(!cols||cols.length<=textCol)continue;
+    
+    const msgText=(cols[textCol]||'').trim();
+    if(!msgText)continue;
+    
+    const sender=(senderCol>=0?cols[senderCol]:'').trim();
+    const timestamp=dateCol>=0?new Date(cols[dateCol]).getTime():Date.now()-((lines.length-i)*60000);
+    
+    // Detect if sent or received
+    // iMazing: sender might be empty or "Me" for sent messages
+    // Android SMS Exporter: type=2 means sent, type=1 means received
+    let who='them';
+    const typeVal=(typeCol>=0?cols[typeCol]:'').trim();
+    
+    if(typeVal==='2'||typeVal==='sent'||sender.toLowerCase()==='me'||sender===''){
+      who='me';
+    }else if(typeVal==='1'||typeVal==='received'){
+      who='them';
+    }else if(sender){
+      // iMazing format: if sender matches phone owner, it's "me"
+      // Heuristic: if this sender appears in most messages, they're probably the contact (not me)
+      // We'll refine after parsing all messages
+    }
+    
+    messages.push({who,text:msgText,senderName:sender,ts:isNaN(timestamp)?Date.now():timestamp});
+  }
+  
+  // Post-process: if all messages have the same sender, alternate them
+  const uniqueSenders=new Set(messages.map(m=>m.senderName));
+  if(uniqueSenders.size===1){
+    // Can't determine direction, alternate
+    messages.forEach((m,i)=>{m.who=i%2===0?'me':'them';});
+  }else if(uniqueSenders.size===2){
+    // Two senders: the less frequent one is probably "me" (affiliate sends fewer messages in most sales convos)
+    const senderCounts={};
+    messages.forEach(m=>{senderCounts[m.senderName]=(senderCounts[m.senderName]||0)+1;});
+    const sorted=Object.entries(senderCounts).sort((a,b)=>a[1]-b[1]);
+    const meSender=sorted[0][0]; // less frequent = me
+    messages.forEach(m=>{m.who=m.senderName===meSender?'me':'them';});
+  }
+  
+  return messages;
+}
+
+function parseCSVLine(line){
+  const result=[];
+  let current='';
+  let inQuotes=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(ch==='"'){
+      if(inQuotes&&line[i+1]==='"'){current+='"';i++;}
+      else inQuotes=!inQuotes;
+    }else if(ch===','&&!inQuotes){
+      result.push(current);current='';
+    }else{
+      current+=ch;
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+function parseTXT(text){
+  // Common TXT formats from iMazing and others:
+  // "[timestamp] Sender: Message"
+  // "Sender (timestamp): Message"  
+  // Or just alternating lines
+  const lines=text.split('\n').filter(l=>l.trim());
+  const messages=[];
+  
+  for(const line of lines){
+    const trimmed=line.trim();
+    if(!trimmed)continue;
+    
+    // Try pattern: "[date] sender: message"
+    const bracketMatch=trimmed.match(/^\[(.+?)\]\s*(.+?):\s*(.+)$/);
+    if(bracketMatch){
+      const sender=bracketMatch[2].trim();
+      const isMe=sender.toLowerCase()==='me'||sender.toLowerCase()==='you';
+      messages.push({who:isMe?'me':'them',text:bracketMatch[3],senderName:sender,ts:new Date(bracketMatch[1]).getTime()||Date.now()});
+      continue;
+    }
+    
+    // Try pattern: "sender: message"
+    const colonMatch=trimmed.match(/^(.+?):\s+(.+)$/);
+    if(colonMatch&&colonMatch[1].length<30){
+      const sender=colonMatch[1].trim();
+      const isMe=sender.toLowerCase()==='me'||sender.toLowerCase()==='i';
+      messages.push({who:isMe?'me':'them',text:colonMatch[2],senderName:sender,ts:Date.now()-((lines.length-messages.length)*60000)});
+      continue;
+    }
+    
+    // Plain text — alternate
+    messages.push({who:messages.length%2===0?'me':'them',text:trimmed,senderName:'',ts:Date.now()-((lines.length-messages.length)*60000)});
+  }
+  
+  return messages;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SCREENSHOT OCR (Claude Vision API)
+// ═══════════════════════════════════════════════════════════════
+async function handleScreenshots(event){
+  const files=Array.from(event.target.files);
+  if(!files.length)return;
+  
+  const statusEl=document.getElementById('screenshotStatus');
+  statusEl.style.display='block';
+  statusEl.innerHTML=`<div class="spinner"></div> Reading ${files.length} screenshot(s) with AI Vision...`;
+  
+  // Convert first image to base64
+  const file=files[0];
+  const base64=await new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result.split(',')[1]);
+    r.onerror=()=>rej(new Error('Read failed'));
+    r.readAsDataURL(file);
+  });
+  
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1500,
+        messages:[{
+          role:'user',
+          content:[
+            {type:'image',source:{type:'base64',media_type:file.type||'image/jpeg',data:base64}},
+            {type:'text',text:`This is a screenshot of a text message conversation. Extract ALL messages from the image.
+
+For each message, identify:
+1. Whether it was SENT (blue bubble, right side) or RECEIVED (gray/white bubble, left side)
+2. The exact text of the message
+
+Return the conversation as a simple text format:
+Me: [sent message text]
+Them: [received message text]
+Me: [next sent message]
+...
+
+Just the messages in order, nothing else.`}
+          ]
+        }]
+      })
+    });
+    
+    const data=await resp.json();
+    const extracted=data.content?.[0]?.text||'';
+    
+    if(extracted){
+      // Put the OCR'd text into the paste textarea
+      document.getElementById('ac-thread').value=extracted;
+      statusEl.innerHTML=`<span style="color:var(--green);font-weight:700;">✅ Extracted text from screenshot</span><div style="margin-top:4px;font-size:10px;color:var(--t2);">Review the text below, then click "🧠 Auto-Analyze" to fill everything.</div>`;
+      showImportMethod('paste');
+      showToast('📸 Screenshot text extracted!');
+    }else{
+      statusEl.innerHTML='<span style="color:var(--orange);">⚠️ Could not read text from image. Try a clearer screenshot.</span>';
+    }
+  }catch(e){
+    console.error('Screenshot OCR error:',e);
+    statusEl.innerHTML='<span style="color:var(--red);">Connection error. Check network and try again.</span>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONTACT PICKER API (reads from phone contacts)
+// ═══════════════════════════════════════════════════════════════
+async function pickFromPhone(){
+  // Check if Contact Picker API is available
+  if('contacts' in navigator && 'ContactsManager' in window){
+    try{
+      const props = ['name','tel'];
+      const opts = {multiple:false};
+      const contacts = await navigator.contacts.select(props, opts);
+      if(contacts && contacts.length){
+        const c = contacts[0];
+        if(c.name && c.name.length) document.getElementById('ac-name').value = c.name[0];
+        if(c.tel && c.tel.length) document.getElementById('ac-phone').value = c.tel[0];
+        showToast(`📱 Loaded: ${c.name?.[0]||'Contact'}`);
+      }
+    }catch(e){
+      if(e.name !== 'TypeError'){
+        showToast('Contact picker cancelled');
+      } else {
+        fallbackContactPicker();
+      }
+    }
+  } else {
+    fallbackContactPicker();
+  }
+}
+
+function fallbackContactPicker(){
+  // Fallback for desktop or unsupported browsers
+  showToast('📱 Contact Picker works on mobile. Type the name or paste from your phone.');
+  document.getElementById('ac-name').focus();
+}
+
+// Check if Contact Picker is available and show/hide button
+if(!('contacts' in navigator)){
+  // On desktop, change button to say "Search" instead
+  const btn = document.getElementById('contactPickerBtn');
+  if(btn){
+    btn.textContent = '🔍 Search';
+    btn.onclick = ()=>{
+      const name = document.getElementById('ac-name').value.trim();
+      if(!name){showToast('Type a name first');return;}
+      // Search existing CRM contacts
+      const existing = load().filter(c=>c.name.toLowerCase().includes(name.toLowerCase()));
+      if(existing.length){
+        showToast(`Found ${existing.length} existing contact(s): ${existing.map(c=>c.name).join(', ')}`);
+      } else {
+        showToast('No existing contacts match. Adding as new.');
+      }
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SMART THREAD ANALYZER (AI reads conversation, auto-fills form)
+// ═══════════════════════════════════════════════════════════════
+async function analyzeThread(){
+  const thread = document.getElementById('ac-thread').value.trim();
+  if(!thread || thread.length < 20){
+    showToast('Paste a conversation first (at least a few messages)');
+    return;
+  }
+  
+  const resultEl = document.getElementById('threadAnalysisResult');
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = '<div class="spinner"></div> AI is reading the conversation...';
+  
+  const analysisPrompt = `Analyze this text message conversation and extract the following. Respond ONLY in this exact JSON format, nothing else:
+
+{
+  "their_name": "their name if mentioned, or null",
+  "suggested_tier": "t1 or t2 or t3 or t4 or t5a or t5b or t5c",
+  "tier_reasoning": "one sentence why",
+  "suggested_origin": "personal or nft or forex or susu or mlm or sports or referral or lead or social or cold",
+  "origin_reasoning": "one sentence why",
+  "relationship_status": "healthy or dormant or strained or damaged",
+  "rel_reasoning": "one sentence why",
+  "form_notes": "FORM analysis - their family situation, occupation, hobbies/interests, financial situation - based on what's in the conversation",
+  "their_style": "description of how THEY communicate - formal/casual, emoji usage, message length, energy",
+  "your_style": "description of how YOU communicate in this thread",
+  "interests": ["list", "of", "their", "interests"],
+  "potential_objections": ["list of concerns they might have based on the conversation"],
+  "warmth_score": 1-10,
+  "suggested_mode": "casual or motivated or legend",
+  "key_insight": "the single most important thing to know about this person for closing"
+}
+
+CONVERSATION:
+${thread}`;
+
+  try{
+    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content:analysisPrompt}]})
+    });
+    const data = await resp.json();
+    const text = data.content?.[0]?.text||'';
+    
+    // Parse JSON from response
+    let analysis;
+    try{
+      const clean = text.replace(/```json|```/g,'').trim();
+      analysis = JSON.parse(clean);
+    }catch(e){
+      resultEl.innerHTML = `<div style="color:var(--orange);">⚠️ Couldn't parse analysis. Here's what the AI found:</div><div style="margin-top:4px;white-space:pre-wrap;">${text}</div>`;
+      return;
+    }
+    
+    // Auto-fill the form fields
+    if(analysis.their_name && !document.getElementById('ac-name').value){
+      document.getElementById('ac-name').value = analysis.their_name;
+    }
+    if(analysis.suggested_tier){
+      document.getElementById('ac-tier').value = analysis.suggested_tier;
+    }
+    if(analysis.suggested_origin){
+      document.getElementById('ac-origin').value = analysis.suggested_origin;
+    }
+    if(analysis.relationship_status){
+      document.getElementById('ac-rel').value = analysis.relationship_status;
+    }
+    if(analysis.form_notes){
+      document.getElementById('ac-form').value = analysis.form_notes;
+    }
+    if(analysis.suggested_mode){
+      document.getElementById('ac-mode').value = analysis.suggested_mode;
+    }
+    
+    // Show the analysis results
+    resultEl.innerHTML = `
+      <div style="color:var(--green);font-weight:700;margin-bottom:6px;">✅ Thread analyzed — form auto-filled!</div>
+      <div style="display:grid;gap:4px;">
+        <div><strong style="color:var(--gold);">Tier:</strong> ${TIER_NAMES[analysis.suggested_tier]||analysis.suggested_tier} — ${analysis.tier_reasoning||''}</div>
+        <div><strong style="color:var(--purple);">Origin:</strong> ${analysis.origin_reasoning||''}</div>
+        <div><strong style="color:${analysis.relationship_status==='healthy'?'var(--green)':analysis.relationship_status==='damaged'?'var(--red)':'var(--orange)'};">Relationship:</strong> ${analysis.rel_reasoning||''}</div>
+        <div><strong style="color:var(--blue);">Their Style:</strong> ${analysis.their_style||''}</div>
+        <div><strong style="color:var(--cyan);">Warmth:</strong> ${analysis.warmth_score||'?'}/10</div>
+        ${analysis.interests?.length?`<div><strong>Interests:</strong> ${analysis.interests.join(', ')}</div>`:''}
+        ${analysis.potential_objections?.length?`<div><strong style="color:var(--orange);">Likely Objections:</strong> ${analysis.potential_objections.join(', ')}</div>`:''}
+        <div style="margin-top:4px;padding:6px;background:var(--gold-g);border-radius:4px;"><strong style="color:var(--gold);">💡 Key Insight:</strong> ${analysis.key_insight||''}</div>
+      </div>
+      <div style="margin-top:6px;font-size:10px;color:var(--t3);">Review the auto-filled fields above and adjust anything that's off. Then click "Add to Pipeline."</div>
+    `;
+    
+    showToast('🧠 Thread analyzed! Fields auto-filled.');
+    
+  }catch(e){
+    console.error('Thread analysis error:',e);
+    resultEl.innerHTML = '<div style="color:var(--red);">Connection error. Check network and try again.</div>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ADD CONTACT (enhanced with thread import)
+// ═══════════════════════════════════════════════════════════════
+function openAddModal(){document.getElementById('addModal').classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+function saveNewContact(){
+  const name = document.getElementById('ac-name').value.trim();
+  if(!name){showToast('Enter a name');return;}
+  
+  const contacts = load();
+  const newContact = {
+    id: 'c'+Date.now(),
+    name,
+    phone: document.getElementById('ac-phone').value,
+    tier: document.getElementById('ac-tier').value,
+    origin: document.getElementById('ac-origin').value,
+    rel: document.getElementById('ac-rel').value,
+    form: document.getElementById('ac-form').value,
+    stage: 'new',
+    warmup: 'curiosity',
+    mode: document.getElementById('ac-mode').value,
+    day: 1,
+    thread: [],
+    signals: 0,
+    objections: 0,
+    blockers: [],
+    created: Date.now()
+  };
+  
+  // Parse pasted thread if provided — try to split into me/them messages
+  const threadPaste = document.getElementById('ac-thread').value.trim();
+  if(threadPaste){
+    const lines = threadPaste.split('\n').filter(l=>l.trim());
+    let parsed = [];
+    let lastWho = 'them';
+    
+    for(const line of lines){
+      const trimmed = line.trim();
+      if(!trimmed) continue;
+      
+      // Try to detect who's speaking
+      const lowerLine = trimmed.toLowerCase();
+      // Common patterns: "Me:", "You:", "[name]:", timestamps with direction
+      const isMe = lowerLine.startsWith('me:') || lowerLine.startsWith('me ') || 
+                    lowerLine.startsWith('i ') || lowerLine.startsWith('sent:') ||
+                    /^(yo |hey |bro |nah |lol |haha|yeah |ok |bet |so )/i.test(trimmed);
+      
+      // Alternate if can't detect
+      const who = isMe ? 'me' : (lastWho === 'me' ? 'them' : 'me');
+      lastWho = who;
+      
+      const cleanText = trimmed.replace(/^(me:|you:|them:|sent:|received:)\s*/i, '');
+      if(cleanText.length > 1){
+        parsed.push({who, text:cleanText, ts:Date.now()-((lines.length-parsed.length)*3600000)});
+      }
+    }
+    
+    if(parsed.length){
+      newContact.thread = parsed;
+      newContact.warmup = 'permission'; // They have history, past curiosity
+      newContact.stage = 'responded'; // If there's a thread, they've communicated
+      newContact.day = Math.max(1, Math.floor(parsed.length / 2));
+    }
+  }
+  
+  contacts.push(newContact);
+  save(contacts);
+  closeModal('addModal');
+  
+  // Clear form
+  ['ac-name','ac-phone','ac-form','ac-thread'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.value='';
+  });
+  document.getElementById('threadAnalysisResult').style.display='none';
+  
+  renderSidebar();
+  selectContact(newContact.id);
+  
+  // Auto-generate opener
+  setTimeout(()=>aiGenerate(), 500);
+  
+  showToast(`✅ ${name} added — generating opener...`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// VIEW SWITCHING
+// ═══════════════════════════════════════════════════════════════
+function switchView(view, btn){
+  currentView = view;
+  document.querySelectorAll('.top-tab').forEach(t=>t.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+  
+  // Hide all views
+  ['convoView','emptyState','pipelineView','dripsView','analyticsView'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.style.display = 'none';
+  });
+  
+  if(view === 'closer'){
+    if(currentContact){
+      document.getElementById('convoView').style.display = 'flex';
+    } else {
+      document.getElementById('emptyState').style.display = 'flex';
+    }
+  } else if(view === 'pipeline'){
+    document.getElementById('pipelineView').style.display = 'block';
+    renderPipelineView();
+  } else if(view === 'drips'){
+    document.getElementById('dripsView').style.display = 'block';
+    renderDripsView();
+  } else if(view === 'analytics'){
+    document.getElementById('analyticsView').style.display = 'block';
+    renderAnalyticsView();
+  }
+}
+
+function renderPipelineView(){
+  const contacts = load();
+  const stages = ['new','outreach_sent','responded','qualified','call_scheduled','call_done','threeway_done','trial_started','close_attempt','converted','hard_no'];
+  
+  document.getElementById('pipelineView').innerHTML = `
+    <h2 style="font-size:16px;font-weight:800;margin-bottom:16px;">📊 Full Pipeline — ${contacts.length} Contacts</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;overflow-x:auto;">
+      ${stages.map(s=>{
+        const items = contacts.filter(c=>c.stage===s);
+        const color = STAGE_COLORS[s];
+        return `<div style="background:var(--bg2);border-radius:10px;min-height:200px;">
+          <div style="padding:8px 10px;border-bottom:2px solid ${color};font-size:11px;font-weight:700;display:flex;justify-content:space-between;align-items:center;">
+            <span style="color:${color};">${STAGE_LABELS[s]||s}</span>
+            <span style="padding:1px 6px;background:${color};color:#fff;border-radius:4px;font-size:9px;">${items.length}</span>
+          </div>
+          <div style="padding:6px;">
+            ${items.map(c=>`<div class="contact-card" onclick="selectContact('${c.id}')" style="margin-bottom:4px;">
+              <div class="cc-name"><span>${c.name}</span><span class="cc-badge" style="background:${TIER_COLORS[c.tier]}22;color:${TIER_COLORS[c.tier]};">${TIER_SHORT[c.tier]}</span></div>
+              <div class="cc-meta"><span>Day ${c.day}</span>${c.signals?'<span>🔥'+c.signals+'</span>':''}</div>
+            </div>`).join('')}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderDripsView(){
+  const drips = {
+    trial: [
+      {day:1,title:'Welcome + First Pick',color:'var(--green)',script:'Welcome to SBA! 🎉 Here\'s your first pick — [pick details]. Let me know when it cashes. People who lock in Day 1 see 3x results. You ready?'},
+      {day:2,title:'Engagement Check',color:'var(--green)',script:'You place that bet yet? Let me know how it goes 🎯 There were 3 solid arbs today — check the ARB CENTER.'},
+      {day:3,title:'Social Proof + Soft Close',color:'var(--blue)',script:'[Teammate] just posted a $180 profit from yesterday. That could be you! How\'s it going so far? A lot of people lock in their membership around now.'},
+      {day:4,title:'Community Wins',color:'var(--blue)',script:'The group\'s been on FIRE this week. Total $2,400 in documented wins. You getting in on these plays?'},
+      {day:5,title:'Urgency — Halfway',color:'var(--orange)',script:'Halfway through your trial. Ready to go full throttle? The premium plays are where the REAL money is.'},
+      {day:6,title:'FOMO Push',color:'var(--orange)',script:'People locking in left and right. You trying to join them? The math doesn\'t lie — you\'ve seen it work.'},
+      {day:7,title:'Decision Day',color:'var(--red)',script:'One week down. You\'ve seen it works. What\'s the ONE thing holding you back? Let\'s address it right now.'},
+      {day:8,title:'Close Attempt #1',color:'var(--red)',script:'Your trial\'s winding down. Let\'s lock you in — which package fits your goals? Basic ($1K) or Plus ($2K)?'},
+      {day:10,title:'Close Attempt #2',color:'var(--red)',script:'Bro you\'re missing out on the premium plays. Members who locked in when you trialed are up $X already.'},
+      {day:12,title:'Close Attempt #3',color:'var(--red)',script:'2 days left on your access. This is your last chance at this pricing. You in or what?'},
+      {day:14,title:'Final Close #4',color:'var(--red)',script:'Trial ends today. Straight up — are you locking in? I believe in you and I don\'t want you to miss this.'},
+      {day:15,title:'Nurture',color:'var(--t3)',script:'Checking in — you ready to get back in the game? People who started when you trialed are up $X. The opportunity is still here.'},
+    ]
+  };
+  
+  document.getElementById('dripsView').innerHTML = `
+    <h2 style="font-size:16px;font-weight:800;margin-bottom:16px;">💧 Trial Drip Sequences</h2>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;">
+      ${drips.trial.map(d=>`
+        <div class="drip-day">
+          <div class="drip-num" style="background:${d.color}22;color:${d.color};">D${d.day}</div>
+          <div class="drip-content">
+            <div class="title" style="color:${d.color};">${d.title}</div>
+            <div class="script">${d.script}</div>
+            <button class="btn btn-sm btn-ghost" style="margin-top:4px;" onclick="navigator.clipboard?.writeText(\`${d.script.replace(/`/g,'')}\`);showToast('Copied!');">📋 Copy</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderAnalyticsView(){
+  const contacts = load();
+  const total = contacts.length;
+  const converted = contacts.filter(c=>c.stage==='converted').length;
+  const rate = total ? Math.round(converted/total*100) : 0;
+  
+  const tiers = ['t1','t2','t3','t4','t5a','t5b','t5c'];
+  const tierStats = tiers.map(t=>{
+    const tc = contacts.filter(c=>c.tier===t);
+    const conv = tc.filter(c=>c.stage==='converted').length;
+    return {tier:t,total:tc.length,conv,rate:tc.length?Math.round(conv/tc.length*100):0};
+  }).filter(t=>t.total>0);
+  
+  document.getElementById('analyticsView').innerHTML = `
+    <h2 style="font-size:16px;font-weight:800;margin-bottom:16px;">📈 Conversion Analytics</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px;">
+      ${tierStats.map(t=>`
+        <div style="background:var(--card);border:1px solid ${TIER_COLORS[t.tier]};border-radius:10px;padding:14px;text-align:center;">
+          <div style="font-family:'JetBrains Mono';font-size:24px;font-weight:800;color:${TIER_COLORS[t.tier]};">${t.rate}%</div>
+          <div style="font-size:10px;color:var(--t2);">${TIER_NAMES[t.tier]}</div>
+          <div style="font-size:9px;color:var(--t3);">${t.conv}/${t.total}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:16px;font-weight:700;">Overall Conversion Rate</div>
+        <div style="font-size:12px;color:var(--t2);">${converted} conversions from ${total} contacts</div>
+      </div>
+      <div style="font-family:'JetBrains Mono';font-size:36px;font-weight:900;color:var(--green);">${rate}%</div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════
+function autoGrow(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);}
+function openSettings(){showToast('Settings coming soon');}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+renderSidebar();
+</script>
+</body>
+</html>
