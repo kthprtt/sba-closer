@@ -877,7 +877,8 @@ function updateRightPanel(){
 }
 
 // ═══════════════════════════════════════════════════════════════
-// AI GENERATION (Claude API — Option B)
+// AI GENERATION — Uses /api/generate proxy (secure, API key on server)
+// Falls back to template engine if API unavailable
 // ═══════════════════════════════════════════════════════════════
 async function aiGenerate(){
   if(!currentContact) return;
@@ -906,23 +907,196 @@ ${reply ? `\nTHEIR LATEST REPLY: ${reply}` : ''}
 Generate the next message I should send to ${c.name}. Sound like ME based on my previous messages. Follow Keith's strategy for this warm-up stage. Just the message text, nothing else.`;
 
   try{
-    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+    const resp = await fetch('/api/generate',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,system:SYSTEM_PROMPT,messages:[{role:'user',content:userMsg}]})
+      body:JSON.stringify({system:SYSTEM_PROMPT,messages:[{role:'user',content:userMsg}],max_tokens:500})
     });
+    
+    if(!resp.ok) throw new Error(`API ${resp.status}`);
+    
     const data = await resp.json();
     const text = data.content?.[0]?.text;
     if(text){
       showSuggestion(text);
-    } else {
-      document.getElementById('suggText').textContent = 'Could not generate. Try the template engine or try again.';
+      return;
     }
   }catch(e){
-    console.error('AI error:',e);
-    document.getElementById('suggText').textContent = 'Connection error. Check network and try again.';
+    console.log('AI API unavailable, using template engine:', e.message);
+  }
+  
+  // FALLBACK: Template engine (always works, no API needed)
+  const templateMsg = generateTemplate(c, reply);
+  if(templateMsg){
+    showSuggestion(templateMsg);
+  } else {
+    document.getElementById('suggText').textContent = 'Could not generate. Try adding more contact details.';
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// TEMPLATE ENGINE (Option A — works offline, instant, free)
+// ═══════════════════════════════════════════════════════════════
+function generateTemplate(c, reply){
+  const name = c.name;
+  const tier = c.tier;
+  const origin = c.origin;
+  const warmup = c.warmup;
+  const amount = '$' + (Math.floor(Math.random()*400)+200);
+  
+  // If there's a reply, check for objections first
+  if(reply){
+    const lower = reply.toLowerCase();
+    // Buying signal → close
+    if(lower.match(/interested|sounds good|tell me more|how does|show me|sign me up|im in|lets do|how much|cost|price/)){
+      return CLOSE_TEMPLATES[tier]||CLOSE_TEMPLATES.t3;
+    }
+    // Skepticism
+    if(lower.match(/guaranteed|too good|scam|believe|trust|legit|ponzi|scheme/)){
+      return SKEPTIC_TEMPLATES[tier]||SKEPTIC_TEMPLATES.t3;
+    }
+    // Gambling concern
+    if(lower.match(/gambling|gamble|betting|lose|lost|risk/)){
+      return GAMBLING_TEMPLATES[tier]||GAMBLING_TEMPLATES.t3;
+    }
+    // Money objection
+    if(lower.match(/expensive|afford|dont have|no money|broke|tight|cant pay/)){
+      return MONEY_TEMPLATES[tier]||MONEY_TEMPLATES.t3;
+    }
+    // Time objection
+    if(lower.match(/busy|time|schedule|dont have time|no time|kids|work/)){
+      return TIME_TEMPLATES[tier]||TIME_TEMPLATES.t3;
+    }
+    // "Let me think"
+    if(lower.match(/think about|let me think|sleep on|consider|not sure|maybe/)){
+      return THINK_TEMPLATES[tier]||THINK_TEMPLATES.t3;
+    }
+    // 3-way resistance
+    if(lower.match(/dont want to talk|see what you do|show me first|just send info/)){
+      return THREEWAY_TEMPLATES[tier]||THREEWAY_TEMPLATES.t3;
+    }
+    // Generic engaged response
+    return ENGAGED_TEMPLATES[tier]||ENGAGED_TEMPLATES.t3;
+  }
+  
+  // No reply — generate opener based on warmup stage + origin
+  if(warmup === 'curiosity'){
+    const originOpeners = {
+      nft: `Yo ${name}... is this still your number? Been a minute since the NFT days`,
+      forex: `${name}! You still trading? I left that a while ago... found something way better`,
+      susu: `Hey ${name} — you ever get gifted from that SuSu thing? I found something that actually pays every time`,
+      sports: `${name}! You still on DraftKings? I found a way to guarantee profit on sports. Not picking winners — math`,
+      mlm: `Hey ${name}, remember when we were in [company]? I found something that actually works this time. No recruiting needed to make money`,
+      personal: `Hey ${name}! How you been? I gotta tell you about something`,
+      referral: `Hey ${name}! [Mutual friend] told me to reach out to you. I think you'd be really interested in what we're doing`,
+      cold: `Hey ${name}! Hope you're doing well. Quick question — you ever heard of sports arbitrage?`,
+      social: `Hey ${name}! Saw your page — love the content. I wanted to reach out because I think you'd find this interesting`,
+    };
+    return originOpeners[origin] || originOpeners.personal;
+  }
+  
+  if(warmup === 'permission'){
+    const permTemplates = {
+      t1: `${name}, I found something that could really help our family. It's sports related but it's NOT gambling — it's math. Can I tell you about it?`,
+      t2: `Bro I found something crazy... but idk if you'd even be interested. You into making guaranteed money?`,
+      t3: `${name}, I found something with returns you won't believe — 5-38% per TRADE, not per year. And it's math-based, guaranteed. Want me to break it down?`,
+      t4: `I've been doing this thing that's changed my whole financial situation. It's called sports arbitrage — guaranteed profit. Would you be open to hearing about it?`,
+      t5a: `I know it's been a while but I had to reach out. Found something that's making me ${amount}/week guaranteed. Not a scam, not crypto — math. Interested?`,
+    };
+    return permTemplates[tier] || permTemplates.t3;
+  }
+  
+  if(warmup === 'microcommit'){
+    return `Can I send you a quick 2-minute video that shows exactly how it works? Or even better — can I show you the calculator real quick? It'll blow your mind.`;
+  }
+  
+  if(warmup === 'value'){
+    return `Here's what happened yesterday — I opened the app, found 3 plays in 10 minutes, placed them, and made ${amount} before lunch. All guaranteed. No stress. This is what I want for you.`;
+  }
+  
+  if(warmup === 'pitch'){
+    const pitchTemplates = {
+      t1: `${name}, I'm making ${amount}/week with this. 20 minutes a day. The math is guaranteed — you bet both sides on different apps and profit no matter what. I want this for our family. When can we talk?`,
+      t2: `Bro I've been making ${amount}/week guaranteed. Not picking winners — MATH. Both sides covered. 20 min a day. Are you locking in or what?`,
+      t3: `${name}, the numbers don't lie. ${amount}/week, 20 min/day, guaranteed by math. Packages start at $1K for 40 days — most people make it back in week 1. Ready to see the platform?`,
+      t4: `I've been making ${amount}/week with sports arbitrage. It's math-based, guaranteed profit. 20 minutes a day. Would you be open to a quick call so I can show you?`,
+      t5a: `Real talk — I'm making ${amount}/week guaranteed. Sports arbitrage. Both sides covered, math does the work. I wouldn't reach out if it wasn't real. Want to see it?`,
+    };
+    return pitchTemplates[tier] || pitchTemplates.t3;
+  }
+  
+  if(warmup === 'call' || warmup === 'threeway' || warmup === 'zoom'){
+    return `${name}, we do a live Zoom every night at 8pm where my mentor breaks it all down live — the scanner, the math, real results. Way easier to see than text about it. Tonight work? I'll send you the link 🔥`;
+  }
+  
+  // Default follow-up
+  return `Hey ${name}! Just following up — did you get a chance to check out what I sent? The math doesn't change and the opportunity is still here. What questions do you have?`;
+}
+
+// Template libraries for objection handling
+const CLOSE_TEMPLATES = {
+  t1: `Yes! Ok let me set everything up for you. I'll send you the link and walk you through it on the phone tonight. I'm not gonna let you fail — I'll be right there with you. 💛`,
+  t2: `Let's GO! I'm sending you the link right now. We can hop on a quick call and I'll walk you through everything. You're gonna love this 🔥`,
+  t3: `Perfect. Here's the link — packages start at $1K for 40 days. Most people make it back in week 1. I'll walk you through your first bet tonight. Which package fits your goals?`,
+  t4: `Awesome! Here's what happens next — you sign up through my link, get access to the platform, and I'll personally walk you through your first trade. Sound good?`,
+  t5a: `Great! I'll send you the link. Once you're in, you get the scanner, calculator, and I'll help you with your first few trades. Let's make this happen.`,
+};
+
+const SKEPTIC_TEMPLATES = {
+  t1: `I hear you and you're right to be careful. But this isn't picking winners — it's MATH. You bet BOTH sides on different apps. One HAS to win. The math means you profit either way. It's like finding a pricing error at two stores.`,
+  t2: `Bro I was skeptical too until I saw the math. Look — two apps have different odds on the same game. You bet both sides. You profit no matter who wins. It's not about the sport. It's about the NUMBERS.`,
+  t3: `I get it — sounds too good. But here's the math: two sportsbooks price the same event differently. You exploit that gap by betting both sides. Your profit is locked in BEFORE the event starts. Same concept hedge funds use.`,
+  t4: `Totally understand! The simplest way to explain it: two apps disagree on odds for the same game. You bet both sides. One has to win. But because of the odds gap, you profit either way. The math is provable.`,
+  t5a: `A scam would be if sportsbooks showed you what you'd win but never paid out. But DraftKings, FanDuel, Bovada — BILLION dollar companies. They always pay. With SBA, you bet both sides. One HAS to win. That's math, not a scam.`,
+};
+
+const GAMBLING_TEMPLATES = {
+  t1: `I know — and you're right that regular betting IS gambling. But this is COMPLETELY different. In regular betting, you pick one side and hope. In arbitrage, you bet BOTH sides on different apps. One HAS to win. The math guarantees your profit before the game even starts.`,
+  t2: `That's the whole point — this ISN'T betting. You never pick a winner. You bet BOTH sides. It's like if Store A sells something for $80 and Store B buys it for $100. You don't care about the item — you just pocket the $20.`,
+  t3: `Traditional betting IS risky. This is the opposite. Arbitrage means you exploit price differences between platforms. Both sides covered = zero risk. Same concept Wall Street uses, applied to sports odds.`,
+  t4: `Great question! Regular sports betting = you pick a winner and hope. Sports arbitrage = you bet BOTH sides on different apps and the math guarantees profit no matter who wins. It's math, not luck.`,
+  t5a: `Sports arbitrage is the opposite of gambling. You never pick a winner. You bet both sides across different platforms and profit from the odds gap. The profit is calculated and locked in BEFORE the event.`,
+};
+
+const MONEY_TEMPLATES = {
+  t1: `Don't even look at it like that. It's $1,000 for 40 days — that's $25 a day. You spend that on DoorDash. But this $25/day turns into $300-500/week coming BACK to you. It pays for itself in the first week. I wouldn't bring this to you if it wasn't real.`,
+  t2: `It's $1K for 40 days. But here's the thing — most members make that back in their first WEEK. The $1K isn't a cost, it's the seed money that starts printing. And two referrals covers your whole subscription.`,
+  t3: `Packages range from $1K to $10K depending on how aggressive you want to be. The ROI is 5-38% per trade. At $1K with 3 trades/day, you're looking at $150-300/week. The math scales linearly.`,
+  t4: `It's $1,000 to start — 40-day access. Most people make that back within the first 1-2 weeks. Would it help if I showed you the income calculator?`,
+  t5a: `If you don't have money, you NEED an opportunity so you can stop being in that position. $1K gets you in for 40 days. Most make it back in week 1. Two referrals covers your subscription entirely.`,
+};
+
+const TIME_TEMPLATES = {
+  t1: `It takes 20 minutes a day. The app finds the plays, you just execute them. You could do it on your lunch break. And those 20 minutes can make you $100-300. What else makes that per hour?`,
+  t2: `Bro it's literally 20 minutes a day. The AI scanner finds everything. You just click, place, profit. I do it while watching TV at night.`,
+  t3: `Biggest misconception. The AI scanner runs 24/7 — it finds the opportunities, you just execute. 20 minutes a day, $100-300 in profit. That's $300-900/hour effective rate.`,
+  t4: `I totally get it — that's actually why this works. It's only 20 minutes a day. The technology does the heavy lifting.`,
+  t5a: `20 minutes a day. That's it. The system does the work. If you have time to scroll social media, you have time to make money with SBA.`,
+};
+
+const THINK_TEMPLATES = {
+  t1: `What's there to think about? Real talk — you give me $1,000 in the morning, I give you $1,500 back by lunchtime. You didn't have to think about it when you went and got a job to make money, but you have to think about making a 100% return? Let me show you one live arb right now.`,
+  t2: `What is there to think about? The math doesn't change tomorrow. But the arbs happening right now? Those are gone in minutes. Every day you wait is money left on the table. Let me show you one live.`,
+  t3: `I respect that. But here's the thing — every day you wait is profit left on the table. The math works today, tomorrow, and next year. But the opportunities are happening NOW. What specifically do you need to think about?`,
+  t4: `I understand wanting to take your time. But here's what I'd say — look at the site tonight, and I'll answer any questions tomorrow. The math speaks for itself.`,
+  t5a: `What specifically are you unsure about? I want to address whatever's holding you back right now. Because the math doesn't change — the only variable is when you start.`,
+};
+
+const THREEWAY_TEMPLATES = {
+  t1: `It's not a sales call — it's just someone who can explain the math way better than me. They've been doing this for a while and their results are insane. 5 minutes, that's it.`,
+  t2: `Me making money doesn't change whether this works. The people ahead of me? They're already proof. Let me connect you with them — 5 minutes.`,
+  t3: `Info won't answer YOUR questions. 5 minutes on the phone beats an hour of videos. My mentor can show you a live arb in real time. What time works?`,
+  t4: `It's not a sales call. It's a Q&A. They're not trying to convince you — they're showing you what they do. 5 minutes, no pressure.`,
+  t5a: `I respect that. But what if you could research AND talk to someone who does this daily? Best of both worlds. 5 minutes — no pressure.`,
+};
+
+const ENGAGED_TEMPLATES = {
+  t1: `That's a great question. The bottom line is — you give $1,000 in the morning, you can have $1,500 back by lunchtime. The math is guaranteed. There's nothing like this out there. Can I show you the calculator?`,
+  t2: `Facts. And here's the thing — there's nothing better than a 100% win rate. Nothing better than NO RISK. Nothing better than GUARANTEED profit. That's what this is. Ready to see it?`,
+  t3: `Exactly. And the numbers get even better with DVB — Double Value Bets push that 3% arb to 12-38% per trade. Same odds, smarter math. Want me to run the numbers for your situation?`,
+  t4: `Great observation. Let me break it down further — the profit is locked in BEFORE the event even starts. You know exactly what you make before the game. When can we hop on a quick call?`,
+  t5a: `100%. And here's what most people don't realize — people with 401Ks getting 4% over 3 months could get 25% in 2 hours with this. The math doesn't lie. Ready to see it work live?`,
+};
 
 // ═══════════════════════════════════════════════════════════════
 // REPLY ANALYSIS
@@ -1277,7 +1451,7 @@ async function classifyContact(convo){
   }
   
   try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+    const resp=await fetch('/api/generate',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
@@ -1636,7 +1810,7 @@ async function handleScreenshots(event){
   });
   
   try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+    const resp=await fetch('/api/generate',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
@@ -1774,7 +1948,7 @@ CONVERSATION:
 ${thread}`;
 
   try{
-    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+    const resp = await fetch('/api/generate',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content:analysisPrompt}]})
