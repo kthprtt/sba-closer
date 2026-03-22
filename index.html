@@ -724,63 +724,102 @@ function renderSidebar(){
   const q = (document.getElementById('searchContacts')?.value||'').toLowerCase();
   const filtered = q ? contacts.filter(c=>c.name.toLowerCase().includes(q)) : contacts;
   
-  // Group by pipeline stage
-  const groups = {};
   const activeStages = ['new','outreach_sent','followup_1','followup_2','responded','qualified','call_scheduled','call_done','threeway_scheduled','threeway_done','trial_started','trial_d1_3','trial_d4_7','trial_d8_14','close_attempt'];
   const closedStages = ['converted','hard_no','nurture'];
   
-  // Active contacts
   const active = filtered.filter(c=>activeStages.includes(c.stage));
   const closed = filtered.filter(c=>closedStages.includes(c.stage));
   
-  // Sort active by: hot leads first, then by day (higher = more urgent)
-  active.sort((a,b)=>(b.signals-a.signals)||(b.day-a.day));
+  // Sort by last activity (most recent first)
+  active.sort((a,b)=>{
+    const aLast = a.thread?.length ? a.thread[a.thread.length-1].ts : 0;
+    const bLast = b.thread?.length ? b.thread[b.thread.length-1].ts : 0;
+    return (b.signals-a.signals) || (bLast-aLast);
+  });
   
   let html = '';
   
-  // Needs action badge
-  const needsAction = active.filter(c=>c.signals>=2||c.stage==='responded'||c.stage==='qualified');
-  if(needsAction.length){
-    html += `<div class="sb-section"><div class="sb-head" style="color:var(--red);">⚠️ NEEDS ACTION <span class="sb-count" style="background:var(--red);color:#fff;">${needsAction.length}</span></div>`;
-    needsAction.forEach(c=>{html+=renderContactCard(c);});
+  // 📥 JUST REPLIED — last message is from THEM, you need to respond
+  const justReplied = active.filter(c=>{
+    if(!c.thread?.length) return false;
+    return c.thread[c.thread.length-1].who === 'them';
+  });
+  
+  if(justReplied.length){
+    html += `<div class="sb-section"><div class="sb-head" style="color:var(--green);">📥 REPLIED — YOUR TURN <span class="sb-count" style="background:var(--green);color:#000;">${justReplied.length}</span></div>`;
+    justReplied.forEach(c=>{html+=renderContactCard(c,true);});
     html += '</div>';
   }
   
-  // Active
-  const rest = active.filter(c=>!needsAction.includes(c));
+  // 🔥 HOT LEADS — high signals, responded, qualified (but not in justReplied)
+  const hotLeads = active.filter(c=>!justReplied.includes(c) && (c.signals>=2||c.stage==='responded'||c.stage==='qualified'));
+  if(hotLeads.length){
+    html += `<div class="sb-section"><div class="sb-head" style="color:var(--red);">🔥 HOT LEADS <span class="sb-count" style="background:var(--red);color:#fff;">${hotLeads.length}</span></div>`;
+    hotLeads.forEach(c=>{html+=renderContactCard(c);});
+    html += '</div>';
+  }
+  
+  // ACTIVE (remaining)
+  const rest = active.filter(c=>!justReplied.includes(c) && !hotLeads.includes(c));
   if(rest.length){
     html += `<div class="sb-section"><div class="sb-head">ACTIVE <span class="sb-count" style="background:var(--gold-g);color:var(--gold);">${rest.length}</span></div>`;
     rest.forEach(c=>{html+=renderContactCard(c);});
     html += '</div>';
   }
   
-  // Closed
+  // CLOSED
   if(closed.length){
     html += `<div class="sb-section"><div class="sb-head">CLOSED <span class="sb-count" style="background:var(--border);color:var(--t2);">${closed.length}</span></div>`;
     closed.forEach(c=>{html+=renderContactCard(c);});
     html += '</div>';
   }
   
+  if(!filtered.length){
+    html = '<div style="text-align:center;padding:30px 10px;"><div style="font-size:24px;margin-bottom:6px;">👥</div><div style="font-size:12px;color:var(--t2);">Add your first contact to start closing</div></div>';
+  }
+  
   document.getElementById('sidebarContacts').innerHTML = html;
 }
 
-function renderContactCard(c){
+function timeAgo(ts){
+  if(!ts) return '';
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff/60000);
+  if(mins < 1) return 'now';
+  if(mins < 60) return mins+'m';
+  const hrs = Math.floor(mins/60);
+  if(hrs < 24) return hrs+'h';
+  const days = Math.floor(hrs/24);
+  if(days === 1) return '1d';
+  return days+'d';
+}
+
+function renderContactCard(c, isReply){
   const color = TIER_COLORS[c.tier]||'var(--t3)';
   const stageColor = STAGE_COLORS[c.stage]||'var(--t3)';
   const isActive = currentContact?.id === c.id;
   const signals = c.signals >= 2 ? '🔥'.repeat(Math.min(c.signals,3)) : '';
+  const lastMsg = c.thread?.length ? c.thread[c.thread.length-1] : null;
+  const lastTime = lastMsg ? timeAgo(lastMsg.ts) : '';
+  const preview = lastMsg ? (lastMsg.text||'').substring(0,30) + ((lastMsg.text||'').length>30?'...':'') : '';
+  const replyBorder = isReply ? 'border-left:3px solid var(--green);' : '';
   
-  return `<div class="contact-card ${isActive?'active':''}" onclick="selectContact('${c.id}')">
+  return `<div class="contact-card ${isActive?'active':''}" onclick="selectContact('${c.id}')" style="${replyBorder}">
     <div class="cc-name">
       <span>${c.name} ${signals}</span>
-      <span class="cc-badge" style="background:${color}22;color:${color};">${TIER_SHORT[c.tier]||'T?'}</span>
+      <span style="display:flex;align-items:center;gap:4px;">
+        ${isReply?'<span style="width:6px;height:6px;border-radius:50%;background:var(--green);"></span>':''}
+        <span class="cc-badge" style="background:${color}22;color:${color};">${TIER_SHORT[c.tier]||'T?'}</span>
+      </span>
     </div>
+    ${preview?`<div style="font-size:10px;color:var(--t3);margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${lastMsg.who==='them'?'↩ ':'↪ '}${preview}</div>`:''}
     <div class="cc-meta">
       <span class="cc-stage" style="background:${stageColor}22;color:${stageColor};">${STAGE_LABELS[c.stage]||c.stage}</span>
       <span>${ORIGIN_LABELS[c.origin]?.split(' ')[0]||''}</span>
+      ${lastTime?`<span style="margin-left:auto;font-size:9px;color:${isReply?'var(--green)':'var(--t3)'};">${lastTime}</span>`:''}
     </div>
-    ${c.day>0&&c.stage!=='converted'&&c.stage!=='hard_no'?`<div class="cc-due">Day ${c.day} • ${c.mode}</div>`:''}
   </div>`;
+}
 }
 
 function filterSidebar(){renderSidebar();}
