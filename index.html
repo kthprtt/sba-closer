@@ -230,10 +230,26 @@ textarea.field-in{resize:none;min-height:50px;}
       <div class="thread" id="convoThread"></div>
 
       <!-- Reply bar -->
-      <div class="reply-bar">
-        <textarea class="reply-input" id="replyInput" placeholder="Paste their reply here..." rows="1" oninput="autoGrow(this)"></textarea>
-        <button class="btn btn-blue btn-sm" onclick="analyzeReply()">🧠 Analyze</button>
-        <button class="btn btn-gold btn-sm" onclick="aiGenerate()">⚡ AI</button>
+      <div class="reply-bar" style="flex-direction:column;gap:6px;">
+        <!-- Flow instruction -->
+        <div style="display:flex;align-items:center;gap:6px;padding:0 4px;">
+          <div style="font-size:9px;color:var(--t3);line-height:1.3;flex:1;">
+            <strong style="color:var(--gold);">How it works:</strong> Copy their reply from your Messages app → paste here → click Analyze → AI generates your next message → copy it → send in Messages
+          </div>
+        </div>
+        <!-- Their reply input -->
+        <div style="display:flex;gap:6px;align-items:flex-end;">
+          <div style="flex:1;position:relative;">
+            <textarea class="reply-input" id="replyInput" placeholder="📥 Paste their reply here..." rows="1" oninput="autoGrow(this)" style="width:100%;"></textarea>
+          </div>
+          <button class="btn btn-blue btn-sm" onclick="analyzeReply()" title="Analyze their reply and auto-generate your response">🧠 Analyze</button>
+          <button class="btn btn-gold btn-sm" onclick="aiGenerate()" title="Generate AI response based on conversation">⚡ AI</button>
+        </div>
+        <!-- Log YOUR sent message -->
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input type="text" id="logMyMsg" class="reply-input" placeholder="📤 Log what YOU sent (optional — keeps thread accurate)" style="flex:1;font-size:11px;padding:6px 10px;">
+          <button class="btn btn-sm" style="background:var(--green-d);color:var(--green);border:1px solid var(--green);font-size:10px;padding:4px 10px;white-space:nowrap;" onclick="logMyMessage()">✅ Log Sent</button>
+        </div>
       </div>
     </div>
 
@@ -1174,6 +1190,23 @@ function analyzeReply(){
   }
   
   document.getElementById('replyInput').value = '';
+}
+
+// LOG YOUR OWN SENT MESSAGE
+function logMyMessage(){
+  const msg = document.getElementById('logMyMsg')?.value?.trim();
+  if(!msg || !currentContact) return;
+  const contacts = load();
+  const c = contacts.find(x=>x.id===currentContact.id);
+  if(c){
+    c.thread.push({who:'me',text:msg,ts:Date.now()});
+    c.day = Math.max(c.day, Math.ceil((Date.now() - (c.thread[0]?.ts||Date.now())) / 86400000) + 1);
+    save(contacts);
+    currentContact = c;
+    renderThread();
+    renderSidebar();
+    document.getElementById('logMyMsg').value = '';
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
