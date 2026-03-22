@@ -194,8 +194,36 @@ textarea.field-in{resize:none;min-height:50px;}
     <div class="main-empty" id="emptyState">
       <div class="big">🤖</div>
       <h2>AI Closing Machine</h2>
-      <p>Select a contact from the sidebar or add a new one to start closing. The AI will guide you through Keith's 7-phase closing process.</p>
-      <button class="btn btn-gold" style="margin-top:16px;" onclick="openAddModal()">➕ Add Your First Contact</button>
+      <p style="margin-bottom:16px;">Your personal AI-powered recruiting assistant. Add a contact and let the AI guide you through every step of the close.</p>
+      
+      <div style="text-align:left;max-width:420px;margin:0 auto 16px;">
+        <div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">How It Works — 5 Steps</div>
+        <div style="display:grid;gap:6px;">
+          <div style="display:flex;gap:10px;align-items:center;padding:8px;background:var(--bg2);border-radius:6px;border-left:3px solid var(--gold);">
+            <span style="font-size:16px;">1️⃣</span>
+            <div style="font-size:11px;color:var(--t2);"><strong style="color:var(--t1);">Add a contact</strong> — name, tier, how you know them</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;padding:8px;background:var(--bg2);border-radius:6px;border-left:3px solid var(--green);">
+            <span style="font-size:16px;">2️⃣</span>
+            <div style="font-size:11px;color:var(--t2);"><strong style="color:var(--t1);">AI generates your opener</strong> — personalized to their tier and origin</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;padding:8px;background:var(--bg2);border-radius:6px;border-left:3px solid var(--blue);">
+            <span style="font-size:16px;">3️⃣</span>
+            <div style="font-size:11px;color:var(--t2);"><strong style="color:var(--t1);">Copy & send</strong> — paste into Messages/WhatsApp/DM and send</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;padding:8px;background:var(--bg2);border-radius:6px;border-left:3px solid var(--purple);">
+            <span style="font-size:16px;">4️⃣</span>
+            <div style="font-size:11px;color:var(--t2);"><strong style="color:var(--t1);">They reply → paste it back</strong> — AI detects buying signals, objections, blockers</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;padding:8px;background:var(--bg2);border-radius:6px;border-left:3px solid var(--red);">
+            <span style="font-size:16px;">5️⃣</span>
+            <div style="font-size:11px;color:var(--t2);"><strong style="color:var(--t1);">AI generates next response</strong> — repeat until close. Keith's 7-phase strategy built in.</div>
+          </div>
+        </div>
+      </div>
+      
+      <button class="btn btn-gold" style="margin-top:8px;padding:12px 28px;font-size:14px;" onclick="openAddModal()">➕ Add Your First Contact</button>
+      <div style="margin-top:10px;font-size:10px;color:var(--t3);">Or import your entire phone: click ➕ → 📁 Upload → bulk classify with AI</div>
     </div>
 
     <!-- Conversation view (shown when contact selected) -->
